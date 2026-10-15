@@ -1,0 +1,25 @@
+# Rust / Cargo
+src-tauri/target/
+**/*.rs.bk
+Cargo.lock
+
+# Node / Web
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Editor & OS
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# SAMM Runtime Local Data
+**/SAMM/
+**/*.part

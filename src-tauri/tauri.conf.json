@@ -1,0 +1,32 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "San Andreas Mod Manager",
+  "version": "0.1.0",
+  "identifier": "org.samm.modmanager",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "San Andreas Mod Manager (SAMM)",
+        "width": 1280,
+        "height": 840,
+        "minWidth": 980,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: asset: http://asset.localhost;"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}

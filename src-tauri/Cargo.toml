@@ -1,0 +1,38 @@
+[package]
+name = "samm"
+version = "0.1.0"
+description = "San Andreas Mod Manager (SAMM)"
+authors = ["SAMM Open Source Contributors"]
+edition = "2021"
+
+[lib]
+name = "samm_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.1", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+zip = { version = "2.2", default-features = false, features = ["deflate"] }
+sha2 = "0.10"
+hex = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dirs = "5.0"
+thiserror = "2.0"
+tempfile = "3.13"
+regex = "1.11"
+async-trait = "0.1"
+futures-util = "0.3"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
