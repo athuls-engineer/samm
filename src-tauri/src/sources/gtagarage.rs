@@ -58,10 +58,8 @@ impl SourceAdapter for GtaGarageAdapter {
         category: Option<&str>,
         _page: u32,
     ) -> Result<Vec<ModRecord>, String> {
-        let mut results = Vec::new();
-
-        if query.is_empty() || query.to_lowercase().contains("img") || query.to_lowercase().contains("alci") {
-            results.push(ModRecord {
+        let catalog = vec![
+            ModRecord {
                 id: "gtagarage_alci_img".to_string(),
                 source_id: "gtagarage".to_string(),
                 source_mod_id: "alci_img_editor".to_string(),
@@ -69,8 +67,8 @@ impl SourceAdapter for GtaGarageAdapter {
                 author: "Alci".to_string(),
                 description: "Classic standalone tool for inspecting, rebuilding, and extracting RenderWare asset files inside gta3.img.".to_string(),
                 category: "Tools".to_string(),
-                tags: vec!["tool".to_string(), "img".to_string()],
-                thumbnail_url: None,
+                tags: vec!["tool".to_string(), "img".to_string(), "utility".to_string()],
+                thumbnail_url: Some("https://images.gtagarage.com/images/1723.jpg".to_string()),
                 page_url: "https://www.gtagarage.com/mods/show.php?id=1723".to_string(),
                 download_url: None,
                 file_size_formatted: Some("680 KB".to_string()),
@@ -82,11 +80,144 @@ impl SourceAdapter for GtaGarageAdapter {
                 incompatibilities: Vec::new(),
                 installation_strategy: InstallationStrategyType::Manual,
                 confidence: "confirmed".to_string(),
-                compatibility_reason: "External utility. Run outside game directory.".to_string(),
-            });
-        }
+                compatibility_reason: "Standalone utility. Run outside game directory for IMG operations.".to_string(),
+            },
+            ModRecord {
+                id: "gtagarage_magic_txd".to_string(),
+                source_id: "gtagarage".to_string(),
+                source_mod_id: "magic_txd".to_string(),
+                title: "Magic.TXD Editor".to_string(),
+                author: "DK22Pac & The_GTA".to_string(),
+                description: "Modern, high-performance RenderWare TXD texture archive editor supporting DXT compression, mipmaps, and all GTA formats.".to_string(),
+                category: "Tools".to_string(),
+                tags: vec!["tool".to_string(), "textures".to_string(), "txd".to_string()],
+                thumbnail_url: Some("https://images.gtagarage.com/images/27862.jpg".to_string()),
+                page_url: "https://www.gtagarage.com/mods/show.php?id=27862".to_string(),
+                download_url: None,
+                file_size_formatted: Some("14.2 MB".to_string()),
+                file_size_bytes: Some(14_889_728),
+                release_date: Some("2016-09-12".to_string()),
+                update_date: Some("2021-04-10".to_string()),
+                supported_game_versions: vec!["Classic PC 1.0 US".to_string(), "Classic PC 1.0 EU".to_string()],
+                required_dependencies: Vec::new(),
+                incompatibilities: Vec::new(),
+                installation_strategy: InstallationStrategyType::Manual,
+                confidence: "confirmed".to_string(),
+                compatibility_reason: "Standalone editor for TXD texture files.".to_string(),
+            },
+            ModRecord {
+                id: "gtagarage_txd_workshop".to_string(),
+                source_id: "gtagarage".to_string(),
+                source_mod_id: "txd_workshop".to_string(),
+                title: "TXD Workshop 5.0".to_string(),
+                author: "Jernej L".to_string(),
+                description: "Legendary texture editor for GTA III, Vice City, and San Andreas TXD files. Simple BMP/PNG export and import.".to_string(),
+                category: "Tools".to_string(),
+                tags: vec!["tool".to_string(), "txd".to_string(), "textures".to_string()],
+                thumbnail_url: Some("https://images.gtagarage.com/images/8320.jpg".to_string()),
+                page_url: "https://www.gtagarage.com/mods/show.php?id=8320".to_string(),
+                download_url: None,
+                file_size_formatted: Some("1.1 MB".to_string()),
+                file_size_bytes: Some(1_153_433),
+                release_date: Some("2007-02-18".to_string()),
+                update_date: Some("2010-12-05".to_string()),
+                supported_game_versions: vec!["Classic PC 1.0 US".to_string(), "Classic PC 1.0 EU".to_string()],
+                required_dependencies: Vec::new(),
+                incompatibilities: Vec::new(),
+                installation_strategy: InstallationStrategyType::Manual,
+                confidence: "confirmed".to_string(),
+                compatibility_reason: "External utility for viewing and modifying textures.".to_string(),
+            },
+            ModRecord {
+                id: "gtagarage_sanny_builder".to_string(),
+                source_id: "gtagarage".to_string(),
+                source_mod_id: "sanny_builder".to_string(),
+                title: "Sanny Builder 3".to_string(),
+                author: "Seemann".to_string(),
+                description: "The premier script compiler, decompiler, and opcode IDE for GTA 3D era games. Essential for CLEO and main.scm scripting.".to_string(),
+                category: "Tools".to_string(),
+                tags: vec!["tool".to_string(), "scripting".to_string(), "cleo".to_string()],
+                thumbnail_url: Some("https://images.gtagarage.com/images/73.jpg".to_string()),
+                page_url: "https://www.gtagarage.com/mods/show.php?id=73".to_string(),
+                download_url: None,
+                file_size_formatted: Some("6.4 MB".to_string()),
+                file_size_bytes: Some(6_710_886),
+                release_date: Some("2006-03-24".to_string()),
+                update_date: Some("2023-08-15".to_string()),
+                supported_game_versions: vec!["Classic PC 1.0 US".to_string(), "Classic PC 1.0 EU".to_string()],
+                required_dependencies: Vec::new(),
+                incompatibilities: Vec::new(),
+                installation_strategy: InstallationStrategyType::Manual,
+                confidence: "confirmed".to_string(),
+                compatibility_reason: "Script editor and disassembler.".to_string(),
+            },
+            ModRecord {
+                id: "gtagarage_col_editor".to_string(),
+                source_id: "gtagarage".to_string(),
+                source_mod_id: "col_editor_2".to_string(),
+                title: "Collision File Editor II (ColEditor II)".to_string(),
+                author: "Steve M".to_string(),
+                description: "Full-featured 3D mesh collision viewer and editor for San Andreas .col files and models.".to_string(),
+                category: "Tools".to_string(),
+                tags: vec!["tool".to_string(), "collision".to_string(), "3d".to_string()],
+                thumbnail_url: None,
+                page_url: "https://www.gtagarage.com/mods/show.php?id=1154".to_string(),
+                download_url: None,
+                file_size_formatted: Some("1.8 MB".to_string()),
+                file_size_bytes: Some(1_887_436),
+                release_date: Some("2008-01-14".to_string()),
+                update_date: Some("2012-07-20".to_string()),
+                supported_game_versions: vec!["Classic PC 1.0 US".to_string(), "Classic PC 1.0 EU".to_string()],
+                required_dependencies: Vec::new(),
+                incompatibilities: Vec::new(),
+                installation_strategy: InstallationStrategyType::Manual,
+                confidence: "confirmed".to_string(),
+                compatibility_reason: "External collision mesh editor.".to_string(),
+            },
+            ModRecord {
+                id: "gtagarage_handling_editor".to_string(),
+                source_id: "gtagarage".to_string(),
+                source_mod_id: "sa_handling_editor".to_string(),
+                title: "San Andreas Handling Editor".to_string(),
+                author: "Jernej L".to_string(),
+                description: "Intuitive GUI editor for handling.cfg parameters: mass, drag, transmission, braking, suspension, and flags.".to_string(),
+                category: "Tools".to_string(),
+                tags: vec!["tool".to_string(), "handling".to_string(), "vehicles".to_string()],
+                thumbnail_url: None,
+                page_url: "https://www.gtagarage.com/mods/show.php?id=287".to_string(),
+                download_url: None,
+                file_size_formatted: Some("750 KB".to_string()),
+                file_size_bytes: Some(768_000),
+                release_date: Some("2005-09-18".to_string()),
+                update_date: Some("2009-02-14".to_string()),
+                supported_game_versions: vec!["Classic PC 1.0 US".to_string(), "Classic PC 1.0 EU".to_string()],
+                required_dependencies: Vec::new(),
+                incompatibilities: Vec::new(),
+                installation_strategy: InstallationStrategyType::Manual,
+                confidence: "confirmed".to_string(),
+                compatibility_reason: "Standalone data file editor.".to_string(),
+            },
+        ];
 
-        Ok(results)
+        let q = query.to_lowercase();
+        let cat = category.map(|c| c.to_lowercase());
+
+        let filtered: Vec<ModRecord> = catalog
+            .into_iter()
+            .filter(|m| {
+                let matches_query = q.is_empty()
+                    || m.title.to_lowercase().contains(&q)
+                    || m.description.to_lowercase().contains(&q)
+                    || m.author.to_lowercase().contains(&q)
+                    || m.tags.iter().any(|t| t.to_lowercase().contains(&q));
+
+                let matches_cat = cat.as_ref().map_or(true, |c| m.category.to_lowercase() == *c);
+
+                matches_query && matches_cat
+            })
+            .collect();
+
+        Ok(filtered)
     }
 
     async fn get_mod_details(&self, source_mod_id: &str) -> Result<ModRecord, String> {

@@ -9,6 +9,7 @@ import {
   DownloadJob,
   ModRecord,
   InstallationPlan,
+  AutoInstallStatus,
 } from './types';
 import { api } from './api/client';
 import { Sidebar, NavTab } from './components/Sidebar';
@@ -39,6 +40,7 @@ export const App: React.FC = () => {
   const [conflicts, setConflicts] = useState<FileConflict[]>([]);
   const [backups, setBackups] = useState<BackupRecord[]>([]);
   const [downloadJobs, setDownloadJobs] = useState<DownloadJob[]>([]);
+  const [autoInstallStates, setAutoInstallStates] = useState<Record<string, AutoInstallStatus>>({});
 
   // Modals state
   const [selectedModForDetails, setSelectedModForDetails] = useState<ModRecord | null>(null);
@@ -186,6 +188,114 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleOneClickInstall = async (mod: ModRecord) => {
+    if (!activeGame) {
+      showToast('Please select or locate your GTA: San Andreas installation folder first!', 'error');
+      setCurrentTab('installations');
+      return;
+    }
+
+    if (!mod.downloadUrl) {
+      showToast('Direct download not supported for this source repository.', 'error');
+      return;
+    }
+
+    // Step 1: Initialize status
+    setAutoInstallStates((prev) => ({
+      ...prev,
+      [mod.id]: { step: 'downloading', progress: 5, message: 'Initiating download...' },
+    }));
+
+    try {
+      const job = await api.startDownload(
+        mod.id,
+        mod.title,
+        mod.sourceId,
+        mod.sourceId,
+        mod.downloadUrl
+      );
+
+      setDownloadJobs((prev) => [job, ...prev]);
+
+      // Poll until download finishes
+      const startTime = Date.now();
+      let completedJob: DownloadJob | null = null;
+
+      while (Date.now() - startTime < 180000) {
+        await new Promise((r) => setTimeout(r, 600));
+        const jobs = await api.getDownloadJobs();
+        setDownloadJobs(jobs);
+        const current = jobs.find((j) => j.id === job.id);
+
+        if (current) {
+          if (current.status === 'completed') {
+            completedJob = current;
+            break;
+          } else if (current.status === 'failed') {
+            throw new Error(current.errorMessage || 'Download failed');
+          } else if (current.totalBytes > 0) {
+            const pct = Math.min(99, Math.round((current.downloadedBytes / current.totalBytes) * 100));
+            setAutoInstallStates((prev) => ({
+              ...prev,
+              [mod.id]: {
+                step: 'downloading',
+                progress: pct,
+                message: `Downloading (${pct}%)...`,
+              },
+            }));
+          }
+        }
+      }
+
+      if (!completedJob) {
+        throw new Error('Download timed out');
+      }
+
+      // Step 2: Planning & Conflict Analysis & Backup
+      setAutoInstallStates((prev) => ({
+        ...prev,
+        [mod.id]: { step: 'planning', progress: 100, message: 'Inspecting archive & backing up files...' },
+      }));
+
+      const plan = await api.generateInstallationPlan(
+        completedJob.tempFilePath,
+        activeGame.id,
+        mod.id,
+        mod.title
+      );
+
+      // Step 3: Transactional Deployment into GTA SA
+      setAutoInstallStates((prev) => ({
+        ...prev,
+        [mod.id]: { step: 'installing', progress: 100, message: 'Deploying into GTA: San Andreas...' },
+      }));
+
+      const profileId = activeProfile?.id || 'default_profile';
+      await api.installMod(
+        completedJob.tempFilePath,
+        plan,
+        activeGame.id,
+        profileId
+      );
+
+      // Step 4: Completed
+      setAutoInstallStates((prev) => ({
+        ...prev,
+        [mod.id]: { step: 'completed', progress: 100, message: 'Installed successfully!' },
+      }));
+
+      showToast(`⚡ '${mod.title}' automatically installed into GTA: San Andreas!`, 'success');
+      await loadData();
+    } catch (e: any) {
+      const msg = typeof e === 'string' ? e : e?.message || 'Auto-install failed';
+      setAutoInstallStates((prev) => ({
+        ...prev,
+        [mod.id]: { step: 'failed', error: msg },
+      }));
+      showToast(`Install error: ${msg}`, 'error');
+    }
+  };
+
   const handlePlanReadyFromImport = async (archivePath: string, modTitle: string) => {
     if (!activeGame) {
       showToast('Please locate and activate a game installation first.', 'error');
@@ -302,8 +412,11 @@ export const App: React.FC = () => {
           {currentTab === 'discover' && (
             <DiscoverMods
               sources={sources}
+              installedMods={installedMods}
+              autoInstallStates={autoInstallStates}
               onSelectMod={setSelectedModForDetails}
-              onDownloadMod={handleStartDownload}
+              onOneClickInstall={handleOneClickInstall}
+              onImportArchive={() => setShowArchiveImportModal(true)}
             />
           )}
 
@@ -383,6 +496,41 @@ export const App: React.FC = () => {
 
           {currentTab === 'settings' && <Settings />}
         </main>
+
+        {/* Professional High-Density Status Bar (MO2 / IDE Style) */}
+        <footer className="h-7 bg-bg-card border-t border-border-subtle px-4 flex items-center justify-between text-[11px] text-neutral-400 select-none flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${activeGame ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+              <span className="font-semibold text-neutral-300">
+                {activeGame ? `${activeGame.name} (${activeGame.isClassic10 ? 'Classic 1.0 US Verified' : activeGame.detectedEdition})` : 'No Game Configured'}
+              </span>
+              {activeGame && (
+                <span className="font-mono text-neutral-500 truncate max-w-sm text-[10px]">
+                  {activeGame.rootPath}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5 text-neutral-400">
+              <span className="text-[10px] uppercase font-mono text-neutral-500">Profile:</span>
+              <span className="text-neutral-300 font-semibold">{activeProfile?.name || 'Default'}</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-neutral-400">
+              <span className="text-[10px] uppercase font-mono text-neutral-500">Mods:</span>
+              <span className="text-amber-400 font-mono font-bold">{installedMods.filter((m) => m.enabled).length}</span>
+              <span className="text-neutral-500">/</span>
+              <span className="text-neutral-300 font-mono">{installedMods.length}</span>
+            </div>
+
+            <div className="flex items-center gap-1 text-emerald-400 font-medium text-[10px]">
+              <span>🛡️ Safe Journal Active</span>
+            </div>
+          </div>
+        </footer>
       </div>
 
       {/* Mod Details Modal */}
@@ -391,6 +539,7 @@ export const App: React.FC = () => {
           mod={selectedModForDetails}
           onClose={() => setSelectedModForDetails(null)}
           onDownload={handleStartDownload}
+          onOneClickInstall={handleOneClickInstall}
         />
       )}
 

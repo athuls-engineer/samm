@@ -10,18 +10,21 @@ import {
   Shield,
   Layers,
   FileText,
+  Zap,
 } from 'lucide-react';
 
 interface ModDetailsModalProps {
   mod: ModRecord | null;
   onClose: () => void;
   onDownload: (mod: ModRecord) => void;
+  onOneClickInstall?: (mod: ModRecord) => void;
 }
 
 export const ModDetailsModal: React.FC<ModDetailsModalProps> = ({
   mod,
   onClose,
   onDownload,
+  onOneClickInstall,
 }) => {
   if (!mod) return null;
 
@@ -194,28 +197,47 @@ export const ModDetailsModal: React.FC<ModDetailsModalProps> = ({
             className="px-4 py-1.5 rounded text-xs font-semibold text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors flex items-center gap-1.5"
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            <span>Open Website Page</span>
+            <span>Open Source Website</span>
           </a>
 
-          {mod.downloadUrl ? (
-            <button
-              onClick={() => onDownload(mod)}
-              className="px-5 py-2 bg-accent hover:bg-accent-hover text-bg-main text-xs font-bold rounded flex items-center gap-1.5 transition-colors shadow"
-            >
-              <Download className="w-4 h-4" />
-              <span>Download Mod File</span>
-            </button>
-          ) : (
-            <a
-              href={mod.pageUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-semibold rounded flex items-center gap-1.5 transition-colors"
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>Download via System Browser</span>
-            </a>
-          )}
+          <div className="flex items-center gap-2">
+            {mod.downloadUrl ? (
+              <>
+                <button
+                  onClick={() => onDownload(mod)}
+                  className="px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700 text-xs font-medium rounded flex items-center gap-1.5 transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Only</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (onOneClickInstall) {
+                      onOneClickInstall(mod);
+                      onClose();
+                    } else {
+                      onDownload(mod);
+                    }
+                  }}
+                  className="px-5 py-2 bg-accent hover:bg-accent-hover text-bg-main text-xs font-bold rounded flex items-center gap-1.5 transition-colors shadow"
+                >
+                  <Zap className="w-4 h-4 fill-current" />
+                  <span>⚡ 1-Click Install into GTA SA</span>
+                </button>
+              </>
+            ) : (
+              <a
+                href={mod.pageUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-semibold rounded flex items-center gap-1.5 transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Download on Website</span>
+              </a>
+            )}
+          </div>
         </div>
       </div>
     </div>

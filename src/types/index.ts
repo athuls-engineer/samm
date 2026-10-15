@@ -234,3 +234,10 @@ export interface AppSettings {
   theme: 'dark' | 'light';
   logLevel: 'debug' | 'info' | 'warn' | 'error';
 }
+
+export interface AutoInstallStatus {
+  step: 'idle' | 'downloading' | 'planning' | 'installing' | 'completed' | 'failed';
+  progress?: number;
+  message?: string;
+  error?: string;
+}

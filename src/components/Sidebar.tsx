@@ -1,4 +1,5 @@
 import React from 'react';
+import sammLogo from '../assets/logo.svg';
 import {
   Home,
   Compass,
@@ -56,16 +57,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside className="w-64 bg-bg-subtle border-r border-border-subtle flex flex-col justify-between select-none">
       <div>
         {/* Brand Header */}
-        <div className="h-16 flex items-center px-5 border-b border-border-subtle gap-3">
-          <div className="w-8 h-8 rounded bg-accent flex items-center justify-center font-black text-bg-main text-base shadow-sm">
-            SA
-          </div>
-          <div>
-            <div className="font-bold tracking-tight text-white flex items-center gap-1.5">
-              <span>SAMM</span>
-              <span className="text-[10px] font-mono px-1 py-0.2 bg-neutral-800 text-neutral-400 rounded">v0.1</span>
+        <div className="h-16 flex items-center px-4 border-b border-border-subtle gap-3 bg-bg-main/40">
+          <img src={sammLogo} alt="SAMM Logo" className="w-9 h-9 drop-shadow-md flex-shrink-0" />
+          <div className="min-w-0">
+            <div className="font-bold tracking-tight text-white flex items-center gap-1.5 leading-none">
+              <span className="font-mono text-sm tracking-wide text-amber-400 font-extrabold">SAMM</span>
+              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-amber-950/70 text-amber-300 border border-amber-800/60 rounded">PC 1.0</span>
             </div>
-            <div className="text-[11px] text-neutral-400 tracking-tight">San Andreas Mod Manager</div>
+            <div className="text-[10px] text-neutral-400 tracking-tight font-medium mt-1 truncate">San Andreas Mod Manager</div>
           </div>
         </div>
 
