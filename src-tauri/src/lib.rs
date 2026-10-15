@@ -21,6 +21,17 @@ use sources::SourceManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Clean any stale WebView2 locks from previous abrupt kills
+    if let Some(local_app_data) = dirs::data_local_dir() {
+        let lock_file = local_app_data
+            .join("org.samm.modmanager")
+            .join("EBWebView")
+            .join("lockfile");
+        if lock_file.exists() {
+            let _ = std::fs::remove_file(lock_file);
+        }
+    }
+
     let app_data_dir = dirs::data_local_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("SAMM");

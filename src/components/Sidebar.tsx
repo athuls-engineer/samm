@@ -1,5 +1,5 @@
 import React from 'react';
-import sammLogo from '../assets/logo.svg';
+import { Logo } from './Logo';
 import {
   Home,
   Compass,
@@ -58,7 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div>
         {/* Brand Header */}
         <div className="h-16 flex items-center px-4 border-b border-border-subtle gap-3 bg-bg-main/40">
-          <img src={sammLogo} alt="SAMM Logo" className="w-9 h-9 drop-shadow-md flex-shrink-0" />
+          <Logo className="w-9 h-9 drop-shadow-md flex-shrink-0" />
           <div className="min-w-0">
             <div className="font-bold tracking-tight text-white flex items-center gap-1.5 leading-none">
               <span className="font-mono text-sm tracking-wide text-amber-400 font-extrabold">SAMM</span>
