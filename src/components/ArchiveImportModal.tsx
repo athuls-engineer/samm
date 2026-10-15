@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArchiveInspection } from '../types';
 import { api } from '../api/client';
-import { FileArchive, CheckCircle2, AlertTriangle, X, Search } from 'lucide-react';
+import { FileArchive, CheckCircle2, AlertTriangle, X, Search, Globe, DownloadCloud, Loader2 } from 'lucide-react';
 
 interface ArchiveImportModalProps {
   onClose: () => void;
@@ -12,29 +12,84 @@ export const ArchiveImportModal: React.FC<ArchiveImportModalProps> = ({
   onClose,
   onPlanReady,
 }) => {
+  const [importMode, setImportMode] = useState<'local' | 'url'>('local');
   const [archivePath, setArchivePath] = useState('');
+  const [downloadUrl, setDownloadUrl] = useState('');
   const [modTitle, setModTitle] = useState('');
   const [inspecting, setInspecting] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<string | null>(null);
   const [inspection, setInspection] = useState<ArchiveInspection | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleInspect = async () => {
-    if (!archivePath.trim()) return;
+  const handleInspectLocal = async (pathOverride?: string) => {
+    const targetPath = (pathOverride || archivePath).trim();
+    if (!targetPath) return;
     setInspecting(true);
     setError(null);
     setInspection(null);
 
     try {
-      const res = await api.inspectArchive(archivePath.trim());
+      const res = await api.inspectArchive(targetPath);
       setInspection(res);
       if (!modTitle.trim()) {
-        const guessedTitle = archivePath.split(/[\\/]/).pop()?.replace(/\.(zip|rar|7z)$/i, '').replace(/_/g, ' ') || 'Imported Mod';
+        const guessedTitle = targetPath.split(/[\\/]/).pop()?.replace(/\.(zip|rar|7z)$/i, '').replace(/_/g, ' ') || 'Imported Mod';
         setModTitle(guessedTitle);
       }
     } catch (e: any) {
       setError(typeof e === 'string' ? e : e?.message || 'Failed to inspect archive');
     } finally {
       setInspecting(false);
+    }
+  };
+
+  const handleDownloadAndInspect = async () => {
+    const url = downloadUrl.trim();
+    if (!url) return;
+    setInspecting(true);
+    setError(null);
+    setInspection(null);
+    setDownloadProgress('Starting direct download...');
+
+    try {
+      const tempId = `web_mod_${Date.now()}`;
+      const guessedTitle = url.split('/').pop()?.split('?')[0]?.replace(/\.(zip|rar|7z)$/i, '').replace(/_/g, ' ') || 'Web Mod';
+      
+      const job = await api.startDownload(tempId, guessedTitle, 'web_import', 'web_import', url);
+
+      // Poll download
+      const startTime = Date.now();
+      let completedPath: string | null = null;
+
+      while (Date.now() - startTime < 120000) {
+        await new Promise((r) => setTimeout(r, 600));
+        const jobs = await api.getDownloadJobs();
+        const current = jobs.find((j) => j.id === job.id);
+
+        if (current) {
+          if (current.status === 'completed') {
+            completedPath = current.tempFilePath;
+            break;
+          } else if (current.status === 'failed') {
+            throw new Error(current.errorMessage || 'Direct download failed');
+          } else if (current.totalBytes > 0) {
+            const pct = Math.round((current.downloadedBytes / current.totalBytes) * 100);
+            setDownloadProgress(`Downloading: ${pct}% (${(current.downloadedBytes / 1048576).toFixed(1)} MB)...`);
+          }
+        }
+      }
+
+      if (!completedPath) {
+        throw new Error('Download timed out after 2 minutes');
+      }
+
+      setArchivePath(completedPath);
+      setDownloadProgress('Inspecting downloaded package...');
+      await handleInspectLocal(completedPath);
+    } catch (e: any) {
+      setError(typeof e === 'string' ? e : e?.message || 'Failed to download mod package');
+    } finally {
+      setInspecting(false);
+      setDownloadProgress(null);
     }
   };
 
@@ -50,9 +105,9 @@ export const ArchiveImportModal: React.FC<ArchiveImportModalProps> = ({
           <div className="flex items-center gap-2.5">
             <FileArchive className="w-5 h-5 text-accent" />
             <div>
-              <h2 className="text-xs font-bold text-white">Import Local Mod Archive</h2>
+              <h2 className="text-xs font-bold text-white">Import External GTA:SA Mod</h2>
               <p className="text-[11px] text-neutral-400">
-                Safe inspection and installation of manually downloaded ZIP packages.
+                Install any of the 100,000+ GTA SA community mods from a local archive or direct web URL.
               </p>
             </div>
           </div>
@@ -61,33 +116,98 @@ export const ArchiveImportModal: React.FC<ArchiveImportModalProps> = ({
           </button>
         </div>
 
+        {/* Tab Selector */}
+        <div className="flex border-b border-border bg-bg-main/50 px-4 pt-2 gap-2 text-xs">
+          <button
+            onClick={() => { setImportMode('local'); setError(null); }}
+            className={`px-3 py-1.5 font-semibold flex items-center gap-1.5 border-b-2 transition-colors ${
+              importMode === 'local'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-neutral-400 hover:text-neutral-200'
+            }`}
+          >
+            <FileArchive className="w-3.5 h-3.5" />
+            <span>Local Archive (.zip / .rar / .7z)</span>
+          </button>
+          <button
+            onClick={() => { setImportMode('url'); setError(null); }}
+            className={`px-3 py-1.5 font-semibold flex items-center gap-1.5 border-b-2 transition-colors ${
+              importMode === 'url'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-neutral-400 hover:text-neutral-200'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>Direct Download URL</span>
+          </button>
+        </div>
+
         <div className="p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-neutral-300 mb-1">
-              Local Archive File Path (ZIP)
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={archivePath}
-                onChange={(e) => setArchivePath(e.target.value)}
-                placeholder="C:\Downloads\silentpatch_sa.zip"
-                className="flex-1 bg-bg-main border border-border rounded px-3 py-1.5 text-xs text-white placeholder-neutral-500 font-mono focus:outline-none focus:border-accent"
-              />
-              <button
-                onClick={handleInspect}
-                disabled={inspecting || !archivePath.trim()}
-                className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 ${
-                  archivePath.trim()
-                    ? 'bg-neutral-700 hover:bg-neutral-600 text-white'
-                    : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
-                }`}
-              >
-                <Search className="w-3.5 h-3.5" />
-                <span>{inspecting ? 'Inspecting...' : 'Inspect'}</span>
-              </button>
+          {importMode === 'local' ? (
+            <div>
+              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                Local Archive File Path (ZIP, RAR, 7Z)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={archivePath}
+                  onChange={(e) => setArchivePath(e.target.value)}
+                  placeholder="C:\Downloads\nissan_skyline_gtr34.zip"
+                  className="flex-1 bg-bg-main border border-border rounded px-3 py-1.5 text-xs text-white placeholder-neutral-500 font-mono focus:outline-none focus:border-accent"
+                />
+                <button
+                  onClick={() => handleInspectLocal()}
+                  disabled={inspecting || !archivePath.trim()}
+                  className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 ${
+                    archivePath.trim()
+                      ? 'bg-neutral-700 hover:bg-neutral-600 text-white'
+                      : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                  }`}
+                >
+                  <Search className="w-3.5 h-3.5" />
+                  <span>{inspecting ? 'Inspecting...' : 'Inspect'}</span>
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                Direct Download Link (URL to .zip, .rar, .7z)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={downloadUrl}
+                  onChange={(e) => setDownloadUrl(e.target.value)}
+                  placeholder="https://example.com/mods/supercar_pack.zip"
+                  className="flex-1 bg-bg-main border border-border rounded px-3 py-1.5 text-xs text-white placeholder-neutral-500 font-mono focus:outline-none focus:border-accent"
+                />
+                <button
+                  onClick={handleDownloadAndInspect}
+                  disabled={inspecting || !downloadUrl.trim()}
+                  className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 ${
+                    downloadUrl.trim()
+                      ? 'bg-accent hover:bg-accent-hover text-bg-main font-bold'
+                      : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                  }`}
+                >
+                  {inspecting ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <DownloadCloud className="w-3.5 h-3.5" />
+                  )}
+                  <span>{inspecting ? 'Downloading...' : 'Fetch & Inspect'}</span>
+                </button>
+              </div>
+              {downloadProgress && (
+                <div className="text-[11px] font-mono text-amber-400 mt-2 flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>{downloadProgress}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {error && (
             <div className="p-3 rounded bg-rose-950/40 border border-rose-800/80 text-rose-300 text-xs flex items-center gap-2">

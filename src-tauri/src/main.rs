@@ -38,8 +38,9 @@ mod single_instance {
                 if !hwnd.is_null() {
                     ShowWindow(hwnd, 9); // SW_RESTORE
                     SetForegroundWindow(hwnd);
+                    return false; // Active window exists and focused
                 }
-                return false;
+                // No active window found; mutex was abandoned or stale from previous run, proceed with startup
             }
         }
         true
@@ -47,13 +48,15 @@ mod single_instance {
 }
 
 fn main() {
+    let _ = std::fs::write("samm_startup.log", "SAMM main entry reached\n");
     #[cfg(windows)]
     {
         if !single_instance::check_or_focus() {
-            // Already running: Focused the existing window and exiting gracefully without WebView2 lock collision
+            let _ = std::fs::write("samm_startup.log", "Exiting: single_instance check returned false (already running)\n");
             return;
         }
     }
 
+    let _ = std::fs::write("samm_startup.log", "Invoking samm_lib::run()\n");
     samm_lib::run();
 }

@@ -32,6 +32,11 @@ pub fn run() {
         }
     }
 
+    let _ = std::fs::OpenOptions::new().create(true).append(true).open("samm_startup.log").map(|mut f| {
+        use std::io::Write;
+        let _ = writeln!(f, "Purging locks and preparing SAMM dir");
+    });
+
     let app_data_dir = dirs::data_local_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("SAMM");
@@ -39,7 +44,21 @@ pub fn run() {
     let _ = std::fs::create_dir_all(&app_data_dir);
     let db_path = app_data_dir.join("samm.db");
 
-    let db = Database::init(&db_path).expect("Failed to initialize SAMM SQLite database");
+    let _ = std::fs::OpenOptions::new().create(true).append(true).open("samm_startup.log").map(|mut f| {
+        use std::io::Write;
+        let _ = writeln!(f, "Initializing SQLite DB at {:?}", db_path);
+    });
+
+    let db = match Database::init(&db_path) {
+        Ok(d) => d,
+        Err(e) => {
+            let _ = std::fs::OpenOptions::new().create(true).append(true).open("samm_startup.log").map(|mut f| {
+                use std::io::Write;
+                let _ = writeln!(f, "Database init ERROR: {:?}", e);
+            });
+            panic!("DB init failed: {:?}", e);
+        }
+    };
     let source_manager = SourceManager::new();
     let download_manager = DownloadManager::new(db.clone());
 
@@ -50,7 +69,7 @@ pub fn run() {
         app_data_dir,
     });
 
-    tauri::Builder::default()
+    let res = tauri::Builder::default()
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             commands::get_installations,
@@ -83,6 +102,18 @@ pub fn run() {
             commands::get_settings,
             commands::save_settings,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running SAMM desktop application");
+        .run(tauri::generate_context!());
+
+    if let Err(e) = res {
+        let _ = std::fs::OpenOptions::new().create(true).append(true).open("samm_startup.log").map(|mut f| {
+            use std::io::Write;
+            let _ = writeln!(f, "Tauri Run Error: {:?}", e);
+        });
+        panic!("Tauri run error: {:?}", e);
+    } else {
+        let _ = std::fs::OpenOptions::new().create(true).append(true).open("samm_startup.log").map(|mut f| {
+            use std::io::Write;
+            let _ = writeln!(f, "Tauri exited cleanly.");
+        });
+    }
 }

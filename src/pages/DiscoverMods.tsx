@@ -68,11 +68,17 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
   }, [query, selectedSource, selectedCategory]);
 
   const quickFilterTabs = [
-    { id: 'All', label: 'All Mods' },
-    { id: 'Plugins / ASI', label: '⚡ ASI & Essential Fixes' },
+    { id: 'All', label: 'All Mods (80+ Classics)' },
+    { id: 'Plugins / ASI', label: '⚡ ASI & Engine Fixes' },
+    { id: 'Total Conversions', label: '🌍 Total Conversions & Maps' },
     { id: 'Graphics / Plugins', label: '🎨 PS2 Graphics & Shaders' },
+    { id: 'Graphics / Textures', label: '🖼️ HD World & Textures' },
     { id: 'Scripts / CLEO', label: '📜 CLEO Scripts' },
-    { id: 'Tools / Frameworks', label: '🛠️ Modding Utilities' },
+    { id: 'Tools / Frameworks', label: '🛠️ Loaders & Frameworks' },
+    { id: 'Gameplay / Scripts', label: '🎮 Gameplay & Overhauls' },
+    { id: 'Vehicles / Assets', label: '🚗 Vehicles & Supercars' },
+    { id: 'Audio / Sounds', label: '🎵 Radio & Soundpacks' },
+    { id: 'Tools', label: '🔧 Standalone Editors' },
   ];
 
   const getSourceBadgeColor = (sourceId: string) => {
@@ -106,16 +112,16 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
             </span>
           </div>
           <p className="text-xs text-neutral-400 mt-1">
-            Curated and community repositories. Click <strong className="text-amber-400">⚡ 1-Click Install</strong> to automatically download, verify, backup, and deploy directly into your active game directory.
+            Browse the canonical GTA SA modding library, or import from the <strong>100,000+ community mods</strong> on GTAinside and LibertyCity. Click <strong className="text-amber-400">⚡ 1-Click Install</strong> to auto-deploy into your active game directory.
           </p>
         </div>
 
         <button
           onClick={onImportArchive}
-          className="flex items-center gap-2 px-3.5 py-1.5 rounded bg-bg-card hover:bg-bg-hover border border-border text-xs text-neutral-200 font-medium transition-colors self-start md:self-auto shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 rounded bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition-colors self-start md:self-auto shadow-md"
         >
-          <FolderDown className="w-4 h-4 text-accent" />
-          <span>Manual Archive Import</span>
+          <FolderDown className="w-4 h-4 text-neutral-950" />
+          <span>Import Any Mod / URL</span>
         </button>
       </div>
 
