@@ -68,11 +68,13 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
   }, [query, selectedSource, selectedCategory]);
 
   const quickFilterTabs = [
-    { id: 'All', label: 'All Mods (80+ Classics)' },
+    { id: 'All', label: 'All Mods (220+ Classics)' },
     { id: 'Plugins / ASI', label: '⚡ ASI & Engine Fixes' },
     { id: 'Total Conversions', label: '🌍 Total Conversions & Maps' },
     { id: 'Graphics / Plugins', label: '🎨 PS2 Graphics & Shaders' },
     { id: 'Graphics / Textures', label: '🖼️ HD World & Textures' },
+    { id: 'Skins / Models', label: '👤 HD Skins & Characters' },
+    { id: 'Weapons / Assets', label: '🔫 Weapons & Arsenal' },
     { id: 'Scripts / CLEO', label: '📜 CLEO Scripts' },
     { id: 'Tools / Frameworks', label: '🛠️ Loaders & Frameworks' },
     { id: 'Gameplay / Scripts', label: '🎮 Gameplay & Overhauls' },
