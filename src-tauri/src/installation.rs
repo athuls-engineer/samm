@@ -244,7 +244,8 @@ pub fn execute_installation_transaction(
     for op in &plan.file_operations {
         let dest = Path::new(&op.destination_absolute_path);
         if dest.exists() && dest.is_file() {
-            let backup_filename = format!("{}_{}", uuid::Uuid::new_v4().simple(), dest.file_name().unwrap().to_string_lossy());
+            let fname = dest.file_name().unwrap_or_default().to_string_lossy();
+            let backup_filename = format!("{}_{}", uuid::Uuid::new_v4().simple(), fname);
             let backup_file = tx_backup_dir.join(&backup_filename);
 
             fs::copy(dest, &backup_file).map_err(|e| {

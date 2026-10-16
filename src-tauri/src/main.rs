@@ -51,6 +51,16 @@ fn main() {
     let _ = std::fs::write("samm_startup.log", "SAMM main entry reached\n");
     #[cfg(windows)]
     {
+        // Explicitly set AppUserModelID so Windows taskbar pins and displays the embedded icon
+        #[link(name = "shell32")]
+        extern "system" {
+            fn SetCurrentProcessExplicitAppUserModelID(AppID: *const u16) -> i32;
+        }
+        let app_id: Vec<u16> = "org.samm.modmanager\0".encode_utf16().collect();
+        unsafe {
+            let _ = SetCurrentProcessExplicitAppUserModelID(app_id.as_ptr());
+        }
+
         if !single_instance::check_or_focus() {
             let _ = std::fs::write("samm_startup.log", "Exiting: single_instance check returned false (already running)\n");
             return;

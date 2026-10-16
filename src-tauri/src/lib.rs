@@ -14,6 +14,7 @@ pub mod commands;
 mod tests;
 
 use std::sync::Arc;
+use tauri::Manager;
 use commands::AppState;
 use database::Database;
 use downloads::DownloadManager;
@@ -70,6 +71,16 @@ pub fn run() {
     });
 
     let res = tauri::Builder::default()
+        .setup(|app| {
+            if let Some(window) = app.get_webview_window("main") {
+                if let Ok(icon) = tauri::image::Image::from_app_icon_resource(128) {
+                    let _ = window.set_icon(icon);
+                } else if let Some(icon) = app.default_window_icon() {
+                    let _ = window.set_icon(icon.clone());
+                }
+            }
+            Ok(())
+        })
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             commands::get_installations,

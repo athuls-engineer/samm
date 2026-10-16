@@ -80,7 +80,7 @@ impl DownloadManager {
 
         self.db.save_download_job(&job).map_err(|e| e.to_string())?;
 
-        // Spawn async download worker
+        // Spawn async download worker safely using tauri async runtime
         let mgr = self.clone();
         let job_id = job.id.clone();
         let target_url = url.to_string();
@@ -91,7 +91,7 @@ impl DownloadManager {
             list.push(job_id.clone());
         }
 
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             mgr.run_download_loop(job_id, target_url, file_path).await;
         });
 
@@ -105,11 +105,18 @@ impl DownloadManager {
         while retry_count < max_retries {
             match self.execute_chunked_download(&job_id, &url, &target_path).await {
                 Ok(_) => {
-                    // Finalize download: compute complete SHA-256 and rename .part -> .zip
+                    // Finalize download: compute complete SHA-256 and rename .part -> .zip safely
                     let final_path = target_path.with_extension(""); // removes .part
-                    let _ = fs::rename(&target_path, &final_path);
+                    if final_path.exists() {
+                        let _ = fs::remove_file(&final_path);
+                    }
+                    let actual_path = if fs::rename(&target_path, &final_path).is_ok() {
+                        final_path
+                    } else {
+                        target_path.clone()
+                    };
 
-                    let (computed_hash, total_size) = crate::game_detection::compute_file_sha256(&final_path)
+                    let (computed_hash, total_size) = crate::game_detection::compute_file_sha256(&actual_path)
                         .unwrap_or_else(|_| (String::new(), 0));
 
                     if let Ok(mut jobs) = self.db.get_download_jobs() {
@@ -117,7 +124,7 @@ impl DownloadManager {
                             j.status = "completed".to_string();
                             j.downloaded_bytes = total_size;
                             j.total_bytes = total_size;
-                            j.temp_file_path = final_path.to_string_lossy().to_string();
+                            j.temp_file_path = actual_path.to_string_lossy().to_string();
                             j.computed_sha256 = Some(computed_hash.clone());
                             if let Some(ref exp) = j.expected_sha256 {
                                 j.sha256_matched = Some(exp.to_lowercase() == computed_hash.to_lowercase());

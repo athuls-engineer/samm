@@ -276,7 +276,7 @@ pub fn get_backups(
 }
 
 #[tauri::command]
-pub fn start_download(
+pub async fn start_download(
     mod_id: String,
     mod_title: String,
     source_id: String,
