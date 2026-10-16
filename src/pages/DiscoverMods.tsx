@@ -28,6 +28,9 @@ interface DiscoverModsProps {
   onImportArchive: () => void;
 }
 
+// Global module-level cache for instant tab transitions
+const modResultsCache = new Map<string, ModRecord[]>();
+
 export const DiscoverMods: React.FC<DiscoverModsProps> = ({
   sources,
   installedMods,
@@ -39,11 +42,21 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
   const [query, setQuery] = useState('');
   const [selectedSource, setSelectedSource] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [mods, setMods] = useState<ModRecord[]>([]);
+  const [mods, setMods] = useState<ModRecord[]>(() => {
+    return modResultsCache.get('All_all_') || [];
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchMods = async () => {
+    const trimmedQuery = query.trim();
+    const cacheKey = `${selectedCategory}_${selectedSource}_${trimmedQuery}`;
+
+    if (modResultsCache.has(cacheKey)) {
+      setMods(modResultsCache.get(cacheKey)!);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -52,6 +65,7 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
         selectedCategory === 'All' ? undefined : selectedCategory,
         selectedSource === 'all' ? undefined : selectedSource
       );
+      modResultsCache.set(cacheKey, results);
       setMods(results);
     } catch (e: any) {
       setError(typeof e === 'string' ? e : e?.message || 'Failed to search mods');
@@ -61,9 +75,12 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
   };
 
   useEffect(() => {
+    const isActivelyTyping = query.trim().length > 0;
+    // Instant (0ms) when switching categories/sources or initial mount; small 120ms debounce when typing
+    const delay = isActivelyTyping ? 120 : 0;
     const timer = setTimeout(() => {
       fetchMods();
-    }, 250);
+    }, delay);
     return () => clearTimeout(timer);
   }, [query, selectedSource, selectedCategory]);
 

@@ -58,37 +58,34 @@ export const App: React.FC = () => {
 
   const loadData = async () => {
     try {
-      // 1. Installations
-      const insts = await api.getInstallations();
+      // 1. Run root queries concurrently in parallel
+      const [insts, srcs, dls] = await Promise.all([
+        api.getInstallations(),
+        api.listSources(),
+        api.getDownloadJobs(),
+      ]);
+
       setInstallations(insts);
+      setSources(srcs);
+      setDownloadJobs(dls);
+
       const active = insts.find((i) => i.isActive) || insts[0] || null;
       setActiveGame(active);
 
-      // 2. Sources
-      const srcs = await api.listSources();
-      setSources(srcs);
-
-      // 3. Downloads
-      const dls = await api.getDownloadJobs();
-      setDownloadJobs(dls);
-
       if (active) {
-        // 4. Profiles
-        const profs = await api.getProfiles(active.id);
+        // 2. Run active game queries concurrently in parallel
+        const [profs, mods, confs, bks] = await Promise.all([
+          api.getProfiles(active.id),
+          api.getInstalledMods(active.id),
+          api.getConflicts(active.id),
+          api.getBackups(active.id),
+        ]);
+
         setProfiles(profs);
         const activeProf = profs.find((p) => p.isActive) || profs[0] || null;
         setActiveProfile(activeProf);
-
-        // 5. Installed Mods
-        const mods = await api.getInstalledMods(active.id);
         setInstalledMods(mods);
-
-        // 6. Conflicts
-        const confs = await api.getConflicts(active.id);
         setConflicts(confs);
-
-        // 7. Backups
-        const bks = await api.getBackups(active.id);
         setBackups(bks);
       } else {
         setProfiles([]);

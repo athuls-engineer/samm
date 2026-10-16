@@ -6,9 +6,99 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: asset: http://asset.localhost;" />
     <title>San Andreas Mod Manager</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html, body {
+        background-color: #09090b !important;
+        color: #f1f5f9;
+        margin: 0;
+        padding: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        user-select: none;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+      }
+      .pre-splash {
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(circle at 50% 35%, #181c24 0%, #09090b 75%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      .pre-splash-logo {
+        width: 76px;
+        height: 76px;
+        animation: pulse 1.6s ease-in-out infinite alternate;
+      }
+      @keyframes pulse {
+        0% { transform: scale(0.97); opacity: 0.88; filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.25)); }
+        100% { transform: scale(1.03); opacity: 1; filter: drop-shadow(0 0 22px rgba(245, 158, 11, 0.6)); }
+      }
+      .pre-splash-title {
+        margin-top: 18px;
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: #ffffff;
+      }
+      .pre-splash-subtitle {
+        margin-top: 4px;
+        font-size: 11px;
+        color: #94a3b8;
+        letter-spacing: 0.02em;
+      }
+      .pre-splash-bar {
+        margin-top: 20px;
+        width: 140px;
+        height: 3px;
+        background: #1e293b;
+        border-radius: 9999px;
+        overflow: hidden;
+        position: relative;
+      }
+      .pre-splash-bar-inner {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 45%;
+        background: linear-gradient(90deg, #f59e0b, #fbbf24);
+        border-radius: 9999px;
+        animation: progress 1.1s infinite ease-in-out;
+      }
+      @keyframes progress {
+        0% { left: -45%; width: 35%; }
+        50% { width: 55%; }
+        100% { left: 100%; width: 35%; }
+      }
+    </style>
   </head>
   <body class="bg-bg-main text-neutral-200 select-none overflow-hidden font-sans antialiased text-sm">
-    <div id="root"></div>
+    <div id="root">
+      <div class="pre-splash">
+        <svg class="pre-splash-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+          <rect x="4" y="4" width="120" height="120" rx="26" fill="#1e222b" stroke="#f59e0b" stroke-width="6"/>
+          <path d="M 64 22 L 98 36 C 98 70 64 99 64 99 C 64 99 30 70 30 36 Z" fill="#13161d" stroke="#fbbf24" stroke-width="4"/>
+          <path d="M 58 42 C 45 42 41 46 41 51 C 41 57 47 59 55 61 C 65 63 71 66 71 74 C 71 83 63 87 51 87 C 42 87 36 84 33 80 L 37 73 C 40 76 45 79 51 79 C 58 79 62 76 62 72 C 62 67 56 65 48 63 C 39 61 32 57 32 49 C 32 42 39 36 51 36 C 59 36 64 38 68 41 L 64 48 C 60 45 56 42 58 42 Z" fill="#f8fafc"/>
+          <path d="M 78 37 L 93 86 L 84 86 L 80 72 L 67 72 L 67 65 L 78 65 L 75 51 L 70 65 L 67 65 L 74 37 Z" fill="#f59e0b"/>
+          <circle cx="64" cy="92" r="5" fill="#f59e0b"/>
+        </svg>
+        <div class="pre-splash-title">San Andreas Mod Manager</div>
+        <div class="pre-splash-subtitle">Initializing GTA SA 1.0 Baseline...</div>
+        <div class="pre-splash-bar">
+          <div class="pre-splash-bar-inner"></div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

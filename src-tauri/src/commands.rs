@@ -74,21 +74,25 @@ pub async fn search_mods(
     source_id: Option<String>,
     state: State<'_, Arc<AppState>>,
 ) -> Result<Vec<ModRecord>, String> {
-    // 1. Query cached mods in database
-    let mut cached = state.db.query_cached_mods(&query, category.as_deref(), source_id.as_deref())
-        .unwrap_or_default();
-
-    // 2. Fetch live results from source manager
+    // 1. In-memory curated catalog search is lightning fast (sub-millisecond)
     let live_results = state.source_manager.search_all(&query, category.as_deref(), source_id.as_deref()).await;
 
-    for r in &live_results {
-        let _ = state.db.cache_mod_record(r);
-        if !cached.iter().any(|c| c.id == r.id) {
-            cached.push(r.clone());
+    // 2. Combine with any user-imported custom mods from SQLite
+    let custom_cached = state.db.query_cached_mods(&query, category.as_deref(), source_id.as_deref())
+        .unwrap_or_default();
+
+    if custom_cached.is_empty() {
+        return Ok(live_results);
+    }
+
+    let mut results = live_results;
+    for c in custom_cached {
+        if !results.iter().any(|r| r.id == c.id) {
+            results.push(c);
         }
     }
 
-    Ok(cached)
+    Ok(results)
 }
 
 #[tauri::command]
