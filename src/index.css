@@ -3,6 +3,20 @@
 @tailwind utilities;
 
 :root,
+.theme-cyberpunk {
+  --bg-main: #0c0a09;
+  --bg-subtle: #1c1917;
+  --bg-card: #292524;
+  --bg-hover: #44403c;
+  --bg-active: #57534e;
+  --border-subtle: #292524;
+  --border-default: #44403c;
+  --border-strong: #78716c;
+  --accent-default: #eab308;
+  --accent-hover: #ca8a04;
+  --accent-muted: rgba(234, 179, 8, 0.15);
+}
+
 .theme-charcoal {
   --bg-main: #0f1115;
   --bg-subtle: #16181d;
@@ -43,20 +57,6 @@
   --accent-default: #38bdf8;
   --accent-hover: #0284c7;
   --accent-muted: rgba(56, 189, 248, 0.15);
-}
-
-.theme-cyberpunk {
-  --bg-main: #0c0a09;
-  --bg-subtle: #1c1917;
-  --bg-card: #292524;
-  --bg-hover: #44403c;
-  --bg-active: #57534e;
-  --border-subtle: #292524;
-  --border-default: #44403c;
-  --border-strong: #78716c;
-  --accent-default: #eab308;
-  --accent-hover: #ca8a04;
-  --accent-muted: rgba(234, 179, 8, 0.15);
 }
 
 .theme-emerald {

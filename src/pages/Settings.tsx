@@ -30,9 +30,18 @@ interface ThemeOption {
 
 const THEMES: ThemeOption[] = [
   {
+    id: 'cyberpunk',
+    name: 'San Andreas Gold (Default)',
+    desc: 'Warm stone dark with vintage Las Venturas gold',
+    previewBg: '#0c0a09',
+    previewCard: '#292524',
+    previewAccent: '#eab308',
+    previewBorder: '#44403c',
+  },
+  {
     id: 'charcoal',
     name: 'Charcoal Dark',
-    desc: 'Default industrial slate with amber highlight',
+    desc: 'Industrial slate with amber highlight',
     previewBg: '#0f1115',
     previewCard: '#1c1f26',
     previewAccent: '#f59e0b',
@@ -55,15 +64,6 @@ const THEMES: ThemeOption[] = [
     previewCard: '#1e293b',
     previewAccent: '#38bdf8',
     previewBorder: '#334155',
-  },
-  {
-    id: 'cyberpunk',
-    name: 'San Andreas Gold',
-    desc: 'Warm stone dark with vintage Las Venturas gold',
-    previewBg: '#0c0a09',
-    previewCard: '#292524',
-    previewAccent: '#eab308',
-    previewBorder: '#44403c',
   },
   {
     id: 'emerald',

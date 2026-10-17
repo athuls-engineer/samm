@@ -433,7 +433,7 @@ pub fn get_settings(state: State<'_, Arc<AppState>>) -> Result<AppSettings, Stri
         .unwrap_or(false);
     let theme = state.db.get_setting("theme")
         .unwrap_or(None)
-        .unwrap_or_else(|| "charcoal".to_string());
+        .unwrap_or_else(|| "cyberpunk".to_string());
     let log_level = state.db.get_setting("log_level")
         .unwrap_or(None)
         .unwrap_or_else(|| "info".to_string());

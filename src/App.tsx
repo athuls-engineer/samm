@@ -67,9 +67,8 @@ export const App: React.FC = () => {
         api.getSettings().catch(() => null),
       ]);
 
-      if (appSettings?.theme) {
-        document.documentElement.className = 'theme-' + appSettings.theme;
-      }
+      const activeTheme = appSettings?.theme || 'cyberpunk';
+      document.documentElement.className = 'theme-' + activeTheme;
 
       setInstallations(insts);
       setSources(srcs);
