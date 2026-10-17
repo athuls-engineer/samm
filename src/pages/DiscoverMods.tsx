@@ -157,13 +157,13 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
       {/* Filter and Search Bar */}
       <div className="space-y-3">
         {/* Category Pills & Quick 1-Click Toggle */}
-        <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar flex-1">
+        <div className="flex items-center justify-between gap-3 flex-nowrap">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 py-0.5">
             {quickFilterTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setSelectedCategory(tab.id)}
-                className={`h-9 px-3.5 rounded-md font-semibold whitespace-nowrap transition-colors text-xs flex items-center cursor-pointer ${
+                className={`h-9 px-3.5 rounded-md font-semibold whitespace-nowrap transition-colors text-xs flex items-center justify-center cursor-pointer flex-shrink-0 ${
                   selectedCategory === tab.id
                     ? 'bg-accent text-bg-main font-bold shadow-sm'
                     : 'bg-bg-card hover:bg-neutral-800 text-neutral-300 border border-border'
@@ -174,12 +174,14 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
             ))}
           </div>
 
+          <div className="h-5 w-px bg-border flex-shrink-0" />
+
           <button
             onClick={() => setFilterDirectOnly(!filterDirectOnly)}
-            className={`h-9 px-3.5 rounded-md font-bold whitespace-nowrap transition-all text-xs flex items-center gap-1.5 border flex-shrink-0 cursor-pointer ${
+            className={`h-9 px-3.5 rounded-md font-bold whitespace-nowrap transition-all text-xs flex items-center justify-center gap-1.5 border flex-shrink-0 cursor-pointer ${
               filterDirectOnly
-                ? 'bg-amber-500 text-neutral-950 border-amber-400 shadow-md ring-1 ring-amber-400'
-                : 'bg-neutral-900 hover:bg-neutral-800 text-amber-400 border-amber-800/60'
+                ? 'bg-accent text-neutral-950 border-amber-400 shadow-md ring-1 ring-amber-400'
+                : 'bg-bg-card hover:bg-neutral-800 text-accent border-border hover:border-accent/60'
             }`}
             title="Show only mods with direct 1-click automated installation"
           >

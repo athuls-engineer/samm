@@ -321,6 +321,33 @@ pub fn get_conflicts(
 }
 
 #[tauri::command]
+pub fn check_for_conflicts(
+    game_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<FileConflict>, String> {
+    let games = state.db.get_game_installations().map_err(|e| e.to_string())?;
+    let game = games.into_iter().find(|g| g.id == game_id)
+        .ok_or_else(|| format!("Game '{}' not found", game_id))?;
+
+    // 1. Rescan existing mods on disk to ensure any external files are registered
+    let profiles = state.db.get_profiles(&game_id).unwrap_or_default();
+    let active_profile_id = profiles.iter().find(|p| p.is_active).map(|p| p.id.clone())
+        .unwrap_or_else(|| profiles.get(0).map(|p| p.id.clone()).unwrap_or_else(|| "default_profile".to_string()));
+    let _ = crate::existing_mods::sync_existing_mods_into_db(&game, &active_profile_id, &state.db);
+
+    // 2. Scan for all conflicts across ModLoader and game root
+    let installed_mods = state.db.get_installed_mods(&game_id).map_err(|e| e.to_string())?;
+    let detected = crate::conflicts::scan_all_conflicts(&game, &installed_mods);
+
+    // 3. Persist detected conflicts in DB
+    for c in &detected {
+        let _ = state.db.save_conflict(c);
+    }
+
+    Ok(detected)
+}
+
+#[tauri::command]
 pub fn resolve_conflict(
     game_id: String,
     destination_rel_path: String,

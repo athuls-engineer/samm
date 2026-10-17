@@ -135,6 +135,10 @@ export const api = {
     return await invoke('get_conflicts', { gameId });
   },
 
+  checkForConflicts: async (gameId: string): Promise<FileConflict[]> => {
+    return await invoke('check_for_conflicts', { gameId });
+  },
+
   resolveConflict: async (
     gameId: string,
     destinationRelPath: string,

@@ -154,6 +154,7 @@ pub fn run() {
             commands::export_profile,
             commands::import_profile,
             commands::get_conflicts,
+            commands::check_for_conflicts,
             commands::resolve_conflict,
             commands::auto_resolve_conflicts,
             commands::get_backups,

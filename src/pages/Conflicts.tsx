@@ -30,6 +30,29 @@ export const Conflicts: React.FC<ConflictsProps> = ({
 }) => {
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [autoResolving, setAutoResolving] = useState(false);
+  const [scanning, setScanning] = useState(false);
+
+  const handleScanConflicts = async () => {
+    if (!activeGame) {
+      onToast('No active game selected.', 'error');
+      return;
+    }
+
+    setScanning(true);
+    try {
+      const detected = await api.checkForConflicts(activeGame.id);
+      onRefresh();
+      if (detected.length === 0) {
+        onToast('Conflict check complete: Zero file conflicts detected.');
+      } else {
+        onToast(`Conflict check complete: Detected ${detected.length} file collision${detected.length === 1 ? '' : 's'}.`);
+      }
+    } catch (e: any) {
+      onToast(typeof e === 'string' ? e : e?.message || 'Failed to check for conflicts', 'error');
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const handleResolveSingle = async (
     conflict: FileConflict,
@@ -114,24 +137,36 @@ export const Conflicts: React.FC<ConflictsProps> = ({
           </p>
         </div>
 
-        {conflicts.length > 0 && (
+        <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
           <button
-            onClick={handleAutoResolveAll}
-            disabled={autoResolving}
-            className="flex items-center gap-2 px-4 py-2 rounded-md bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition-all shadow-md self-start md:self-auto disabled:opacity-50"
+            onClick={handleScanConflicts}
+            disabled={scanning || autoResolving}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 hover:border-neutral-500 font-semibold text-xs transition-all shadow-sm disabled:opacity-50"
+            title="Scan game directory, ModLoader, and mod manifests for live file collisions"
           >
-            {autoResolving ? (
-              <RefreshCw className="w-4 h-4 animate-spin text-neutral-950" />
-            ) : (
-              <Zap className="w-4 h-4 fill-current text-neutral-950" />
-            )}
-            <span>Auto-Resolve All ({conflicts.length})</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin text-accent' : 'text-neutral-400'}`} />
+            <span>{scanning ? 'Scanning Files...' : 'Check for Conflicts'}</span>
           </button>
-        )}
+
+          {conflicts.length > 0 && (
+            <button
+              onClick={handleAutoResolveAll}
+              disabled={autoResolving || scanning}
+              className="flex items-center gap-2 px-4 py-2 rounded-md bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold text-xs transition-all shadow-md disabled:opacity-50"
+            >
+              {autoResolving ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-neutral-950" />
+              ) : (
+                <Zap className="w-4 h-4 fill-current text-neutral-950" />
+              )}
+              <span>Auto-Resolve All ({conflicts.length})</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {conflicts.length === 0 ? (
-        <div className="bg-bg-card border border-border rounded-lg p-12 text-center text-xs text-neutral-400 space-y-3 shadow-sm">
+        <div className="bg-bg-card border border-border rounded-lg p-12 text-center text-xs text-neutral-400 space-y-4 shadow-sm">
           <div className="w-12 h-12 rounded-full bg-emerald-950/60 border border-emerald-800 flex items-center justify-center mx-auto text-emerald-400">
             <ShieldCheck className="w-6 h-6" />
           </div>
@@ -139,6 +174,16 @@ export const Conflicts: React.FC<ConflictsProps> = ({
           <p className="max-w-md mx-auto text-neutral-400 text-xs leading-relaxed">
             All installed mods have unique target paths or are cleanly isolated inside ModLoader folders. Your game directory is in a consistent state.
           </p>
+          <div className="pt-2">
+            <button
+              onClick={handleScanConflicts}
+              disabled={scanning}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 hover:border-neutral-500 font-semibold text-xs transition-all shadow-sm disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin text-accent' : 'text-neutral-400'}`} />
+              <span>{scanning ? 'Running Collision Scan...' : 'Check for Conflicts Now'}</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
