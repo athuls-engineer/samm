@@ -1,7 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::fs::{self, File};
-use std::io::{self, Read, Write};
-use sha2::{Digest, Sha256};
+use std::fs;
 use crate::models::*;
 use crate::database::Database;
 use crate::archives::{inspect_archive, extract_archive_safely, sanitize_archive_entry_path};
@@ -44,7 +42,7 @@ pub fn generate_installation_plan(
 
         if ["exe", "msi", "bat", "cmd"].contains(&ext.as_str()) {
             has_exe_or_installer = true;
-        } else if ext == "cs" || ext == "fxt" {
+        } else if ext == "cs" || ext == "fxt" || ext == "cleo" {
             has_cs_files = true;
         } else if ext == "asi" {
             has_asi_files = true;
@@ -96,20 +94,17 @@ pub fn generate_installation_plan(
     let mut new_count = 0;
     let mut overwrite_count = 0;
 
-    for entry in &inspection.entries {
-        if entry.is_directory {
-            continue;
-        }
+    let resolved_entries = resolve_archive_layout(&inspection.entries, mod_title, archive_path, &mut warnings);
 
-        let rel_path = entry.path.replace('\\', "/");
-        let ext = Path::new(&rel_path)
+    for resolved in &resolved_entries {
+        let rel_path = &resolved.normalized_subpath;
+        let ext = Path::new(rel_path)
             .extension()
             .and_then(|s| s.to_str())
             .unwrap_or("")
             .to_lowercase();
 
-        // Skip readme/url/txt files from dirtying game root if not needed, or place in modloader
-        let file_name = Path::new(&rel_path)
+        let file_name = Path::new(rel_path)
             .file_name()
             .and_then(|s| s.to_str())
             .unwrap_or("file");
@@ -119,7 +114,7 @@ pub fn generate_installation_plan(
                 (format!("manual_review/{}", file_name), "Manual inspection required".to_string())
             }
             InstallationStrategyType::Cleo => {
-                if ext == "cs" {
+                if ext == "cs" || ext == "cleo" {
                     (format!("cleo/{}", file_name), "Place script in cleo/ directory".to_string())
                 } else if ext == "fxt" {
                     (format!("cleo/cleo_text/{}", file_name), "Place text translation in cleo/cleo_text/".to_string())
@@ -130,10 +125,11 @@ pub fn generate_installation_plan(
                 }
             }
             InstallationStrategyType::Asi => {
-                if ext == "asi" || ext == "ini" || ext == "dll" {
+                if ext == "asi" || ext == "ini" || ext == "dll" || ext == "toml" || ext == "cfg" || ext == "json" || ext == "sp" || ext == "fp" {
                     (file_name.to_string(), "Place plugin in game root directory".to_string())
                 } else {
-                    (format!("modloader/{}/{}", clean_folder, file_name), "Place asset in ModLoader sandbox".to_string())
+                    // Keep companion data folders (e.g. CheatMenuSA/fonts, rainbomizer/) alongside the ASI in game root
+                    (rel_path.clone(), "Place companion plugin asset relative to game root".to_string())
                 }
             }
             InstallationStrategyType::Modloader | InstallationStrategyType::Assets => {
@@ -160,14 +156,14 @@ pub fn generate_installation_plan(
         };
 
         operations.push(PlannedFileOperation {
-            archive_rel_path: entry.path.clone(),
+            archive_rel_path: resolved.archive_path.clone(),
             destination_rel_path: dest_rel,
             destination_absolute_path: dest_abs.to_string_lossy().to_string(),
             file_type: ext,
             rule,
             destination_state: state.to_string(),
             backup_required: exists,
-            file_size_bytes: entry.size,
+            file_size_bytes: resolved.size,
         });
     }
 
@@ -370,28 +366,148 @@ pub fn execute_installation_transaction(
     journal_entry.status = "committed".to_string();
     let _ = db.save_journal_entry(&journal_entry);
 
+    // Auto-resolve any file collisions, root duplicates, or conflicting plugins to guarantee total compatibility
+    let _ = crate::conflicts::auto_resolve_all_conflicts_physical(game, db);
+
     Ok(installed_mod)
 }
 
 fn rollback_transaction(
     backups: &[BackupRecord],
     installed_files: &[InstalledFileRecord],
-    _game_root: &Path,
+    game_root: &Path,
 ) {
     // 1. Remove files that were newly written
     for f in installed_files {
-        let dest = Path::new(&f.destination_rel_path);
+        let dest = game_root.join(&f.destination_rel_path);
         if !f.has_backup && dest.exists() {
-            let _ = fs::remove_file(dest);
+            let _ = fs::remove_file(&dest);
         }
     }
 
     // 2. Restore all files that had backups
     for b in backups {
-        let dest = Path::new(&b.destination_rel_path);
+        let dest = game_root.join(&b.destination_rel_path);
         let src = Path::new(&b.backup_file_path);
         if src.exists() {
-            let _ = fs::copy(src, dest);
+            let _ = fs::copy(src, &dest);
+        }
+    }
+}
+
+pub fn get_mod_dedicated_directories(m: &InstalledMod, game_root: &Path) -> Vec<PathBuf> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    let vanilla_protected = [
+        "anim", "audio", "data", "models", "movies", "text", "samp", "atp", "scripts", "cleo", "modloader",
+    ];
+
+    // Explicit dedicated directory check for Rainbomizer / Randomizer
+    let mod_name_lower = m.name.to_lowercase();
+    if m.id == "github_rainbomizer"
+        || mod_name_lower.contains("rainbomizer")
+        || mod_name_lower.contains("randomizer")
+        || mod_name_lower.contains("randomiser")
+    {
+        let r_dir = game_root.join("rainbomizer");
+        if !dirs.contains(&r_dir) {
+            dirs.push(r_dir);
+        }
+    }
+
+    for f in &m.files {
+        let rel = f.destination_rel_path.replace('\\', "/");
+        let parts: Vec<&str> = rel.split('/').filter(|p| !p.is_empty()).collect();
+        if parts.is_empty() {
+            continue;
+        }
+
+        let first = parts[0];
+        let first_clean = first.trim_end_matches(".disabled");
+
+        // ModLoader folder: modloader/<folder>/... or modloader/_ESSENTIALS/<subfolder>/...
+        if first_clean.eq_ignore_ascii_case("modloader") && parts.len() >= 2 {
+            let mod_folder = parts[1].trim_end_matches(".disabled");
+            if (mod_folder.starts_with('_') || mod_folder.eq_ignore_ascii_case("essentials")) && parts.len() >= 3 {
+                let sub_folder = parts[2].trim_end_matches(".disabled");
+                let d = game_root.join("modloader").join(mod_folder).join(sub_folder);
+                if !dirs.contains(&d) {
+                    dirs.push(d);
+                }
+            } else {
+                let d = game_root.join("modloader").join(mod_folder);
+                if !dirs.contains(&d) {
+                    dirs.push(d);
+                }
+            }
+        }
+        // Subdirectory in scripts or cleo: scripts/<folder>/... or cleo/<folder>/...
+        else if (first_clean.eq_ignore_ascii_case("scripts") || first_clean.eq_ignore_ascii_case("cleo")) && parts.len() >= 3 {
+            let sub_folder = parts[1].trim_end_matches(".disabled");
+            let d = game_root.join(first_clean).join(sub_folder);
+            if !dirs.contains(&d) {
+                dirs.push(d);
+            }
+        }
+        // Top-level custom mod folder: <custom_folder>/...
+        else if !vanilla_protected.iter().any(|v| v.eq_ignore_ascii_case(first_clean)) {
+            if parts.len() >= 2 {
+                let d = game_root.join(first_clean);
+                if !dirs.contains(&d) {
+                    dirs.push(d);
+                }
+            }
+        }
+    }
+
+    dirs
+}
+
+pub fn restore_disabled_files_recursive(dir: &Path) {
+    if !dir.is_dir() {
+        return;
+    }
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                restore_disabled_files_recursive(&path);
+            } else if path.is_file() {
+                let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+                if file_name.ends_with(".disabled") {
+                    let new_name = file_name.trim_end_matches(".disabled");
+                    let restored_path = path.with_file_name(new_name);
+                    let _ = fs::rename(&path, &restored_path);
+                }
+            }
+        }
+    }
+}
+
+pub fn cleanup_empty_parents(dir: &Path, game_root: &Path) {
+    let vanilla_protected = [
+        "anim", "audio", "data", "models", "movies", "text", "samp", "atp", "scripts", "cleo", "modloader",
+    ];
+
+    let mut current = dir.to_path_buf();
+    while current != game_root && current.starts_with(game_root) {
+        if let Some(name) = current.file_name() {
+            let name_str = name.to_string_lossy();
+            if vanilla_protected.iter().any(|p| p.eq_ignore_ascii_case(&name_str)) {
+                break;
+            }
+        } else {
+            break;
+        }
+
+        // Try removing the dir; if it fails (not empty or in use), stop climbing
+        if fs::remove_dir(&current).is_err() {
+            break;
+        }
+
+        if let Some(parent) = current.parent() {
+            current = parent.to_path_buf();
+        } else {
+            break;
         }
     }
 }
@@ -410,30 +526,89 @@ pub fn uninstall_mod(
     let game_root = Path::new(&game.root_path);
     let backups = db.get_backups(&game.id).map_err(|e| e.to_string())?;
 
+    // 1. Identify and purge all dedicated directories (both active and .disabled) recursively
+    let dedicated_dirs = get_mod_dedicated_directories(&target_mod, game_root);
+    for dir in &dedicated_dirs {
+        let dir_str = dir.to_string_lossy().to_string();
+        let clean_str = dir_str.trim_end_matches(".disabled");
+        let active_dir = PathBuf::from(clean_str);
+        let disabled_dir = PathBuf::from(format!("{}.disabled", clean_str));
+
+        if active_dir.is_dir() {
+            let _ = fs::remove_dir_all(&active_dir);
+        }
+        if disabled_dir.is_dir() {
+            let _ = fs::remove_dir_all(&disabled_dir);
+        }
+    }
+
+    // 2. Remove all individual files tracked for this mod (and restore any backups)
     for file_rec in &target_mod.files {
-        let dest_abs = game_root.join(&file_rec.destination_rel_path);
+        let rel = file_rec.destination_rel_path.replace('\\', "/");
+        let rel_clean = rel.trim_end_matches(".disabled");
+        let dest_abs = game_root.join(rel_clean);
+        let disabled_abs = game_root.join(format!("{}.disabled", rel_clean));
 
         if file_rec.has_backup {
-            // Find most recent backup for this file
-            if let Some(backup) = backups.iter().find(|b| b.destination_rel_path == file_rec.destination_rel_path && !b.restored) {
+            let file_rel_norm = file_rec.destination_rel_path.replace('\\', "/");
+            // Find most recent backup for this file and restore original
+            if let Some(backup) = backups.iter().find(|b| b.destination_rel_path.replace('\\', "/") == file_rel_norm && !b.restored) {
                 let backup_file = Path::new(&backup.backup_file_path);
                 if backup_file.exists() {
                     let _ = fs::copy(backup_file, &dest_abs);
                     let mut updated_backup = backup.clone();
                     updated_backup.restored = true;
                     let _ = db.save_backup(&updated_backup);
+                    if disabled_abs.is_file() {
+                        let _ = fs::remove_file(&disabled_abs);
+                    }
                     continue;
                 }
             }
         }
 
-        // If no backup was required (it was a brand new file placed by mod), delete it safely
-        if dest_abs.exists() && dest_abs.is_file() {
-            let _ = fs::remove_file(&dest_abs);
+        // Delete disabled variant if exists
+        if disabled_abs.is_file() {
+            let _ = fs::remove_file(&disabled_abs);
+        }
 
-            // If empty parent dir (e.g. inside modloader/<mod_name>/), clean up
-            if let Some(parent) = dest_abs.parent() {
-                let _ = fs::remove_dir(parent); // Only succeeds if directory is empty
+        // Delete active variant if exists
+        if dest_abs.is_file() {
+            let _ = fs::remove_file(&dest_abs);
+        }
+
+        // Clean up companion .ini files for ASI or CLEO plugins
+        if rel_clean.ends_with(".asi") || rel_clean.ends_with(".cs") {
+            let stem = if rel_clean.ends_with(".asi") {
+                rel_clean.trim_end_matches(".asi")
+            } else {
+                rel_clean.trim_end_matches(".cs")
+            };
+            let ini_active = game_root.join(format!("{}.ini", stem));
+            let ini_disabled = game_root.join(format!("{}.ini.disabled", stem));
+            if ini_active.is_file() {
+                let _ = fs::remove_file(&ini_active);
+            }
+            if ini_disabled.is_file() {
+                let _ = fs::remove_file(&ini_disabled);
+            }
+        }
+
+        // Clean up empty parent directory if safe
+        if let Some(parent) = dest_abs.parent() {
+            cleanup_empty_parents(parent, game_root);
+        }
+    }
+
+    // 3. Mod-specific post-removal cleanup (e.g. standalone readme in game root)
+    let mod_name_lower = target_mod.name.to_lowercase();
+    if target_mod.id == "github_rainbomizer" || mod_name_lower.contains("rainbomizer") || mod_name_lower.contains("randomizer") {
+        let r_readme = game_root.join("readme.txt");
+        if r_readme.is_file() {
+            if let Ok(content) = fs::read_to_string(&r_readme) {
+                if content.contains("Rainbomizer") {
+                    let _ = fs::remove_file(&r_readme);
+                }
             }
         }
     }
@@ -441,3 +616,246 @@ pub fn uninstall_mod(
     db.delete_installed_mod(mod_id).map_err(|e| e.to_string())?;
     Ok(())
 }
+
+pub fn apply_physical_mod_state(m: &mut InstalledMod, enabled: bool, game_root: &Path) {
+    let dedicated_dirs = get_mod_dedicated_directories(m, game_root);
+
+    // 1. Toggle dedicated directories
+    for dir in &dedicated_dirs {
+        let dir_str = dir.to_string_lossy().to_string();
+        let clean_str = dir_str.trim_end_matches(".disabled");
+        let active_dir = PathBuf::from(clean_str);
+        let disabled_dir = PathBuf::from(format!("{}.disabled", clean_str));
+
+        if !enabled {
+            if active_dir.is_dir() {
+                // Restore any individually disabled files inside first so files remain clean
+                restore_disabled_files_recursive(&active_dir);
+                let _ = fs::rename(&active_dir, &disabled_dir);
+            }
+        } else {
+            if disabled_dir.is_dir() {
+                let _ = fs::rename(&disabled_dir, &active_dir);
+            }
+            if active_dir.is_dir() {
+                // Ensure all files inside active directory have active names
+                restore_disabled_files_recursive(&active_dir);
+            }
+        }
+    }
+
+    // 2. Individual file toggling (ASI plugins, CLEO scripts, etc. outside dedicated directories)
+    for f in &m.files {
+        let rel = f.destination_rel_path.replace('\\', "/");
+        let rel_clean = rel.trim_end_matches(".disabled").to_string();
+        let active_path = game_root.join(&rel_clean);
+        let disabled_path = game_root.join(format!("{}.disabled", rel_clean));
+
+        // Skip if this file is located inside one of the dedicated directories already handled
+        let inside_dedicated = dedicated_dirs.iter().any(|d| {
+            let d_clean = PathBuf::from(d.to_string_lossy().trim_end_matches(".disabled"));
+            active_path.starts_with(&d_clean)
+        });
+        if inside_dedicated {
+            continue;
+        }
+
+        if !enabled {
+            if active_path.is_file() {
+                let _ = fs::rename(&active_path, &disabled_path);
+            }
+            // Companion .ini toggling for ASI or CLEO
+            if rel_clean.ends_with(".asi") || rel_clean.ends_with(".cs") {
+                let stem = if rel_clean.ends_with(".asi") {
+                    rel_clean.trim_end_matches(".asi")
+                } else {
+                    rel_clean.trim_end_matches(".cs")
+                };
+                let ini_active = game_root.join(format!("{}.ini", stem));
+                let ini_disabled = game_root.join(format!("{}.ini.disabled", stem));
+                if ini_active.is_file() {
+                    let _ = fs::rename(&ini_active, &ini_disabled);
+                }
+            }
+        } else {
+            if disabled_path.is_file() {
+                let _ = fs::rename(&disabled_path, &active_path);
+            }
+            // Companion .ini restoration
+            if rel_clean.ends_with(".asi") || rel_clean.ends_with(".cs") {
+                let stem = if rel_clean.ends_with(".asi") {
+                    rel_clean.trim_end_matches(".asi")
+                } else {
+                    rel_clean.trim_end_matches(".cs")
+                };
+                let ini_active = game_root.join(format!("{}.ini", stem));
+                let ini_disabled = game_root.join(format!("{}.ini.disabled", stem));
+                if ini_disabled.is_file() {
+                    let _ = fs::rename(&ini_disabled, &ini_active);
+                }
+            }
+        }
+    }
+}
+
+pub struct ResolvedArchiveEntry {
+    pub archive_path: String,
+    pub normalized_subpath: String,
+    pub size: u64,
+}
+
+pub fn resolve_archive_layout(
+    entries: &[ArchiveEntry],
+    mod_title: &str,
+    archive_path: &Path,
+    warnings: &mut Vec<String>,
+) -> Vec<ResolvedArchiveEntry> {
+    let vanilla_dirs = [
+        "anim", "audio", "data", "models", "movies", "text", "samp", "atp", "scripts", "cleo", "modloader",
+    ];
+
+    let file_entries: Vec<&ArchiveEntry> = entries.iter().filter(|e| !e.is_directory).collect();
+    if file_entries.is_empty() {
+        return Vec::new();
+    }
+
+    let mut top_level_map: std::collections::HashMap<String, Vec<&ArchiveEntry>> = std::collections::HashMap::new();
+    let mut root_files: Vec<&ArchiveEntry> = Vec::new();
+
+    for entry in &file_entries {
+        let norm = entry.path.replace('\\', "/");
+        let parts: Vec<&str> = norm.split('/').filter(|p| !p.is_empty()).collect();
+        if parts.len() > 1 {
+            let top = parts[0].to_string();
+            top_level_map.entry(top).or_default().push(entry);
+        } else {
+            root_files.push(entry);
+        }
+    }
+
+    let non_vanilla_tops: Vec<String> = top_level_map
+        .keys()
+        .filter(|k| !vanilla_dirs.iter().any(|v| v.eq_ignore_ascii_case(k)))
+        .cloned()
+        .collect();
+
+    let mut chosen_variant: Option<String> = None;
+    if non_vanilla_tops.len() >= 2 {
+        let mut variant_scores: Vec<(String, i32)> = Vec::new();
+        let title_lower = mod_title.to_lowercase();
+        let archive_stem = archive_path
+            .file_stem()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_lowercase();
+
+        for top in &non_vanilla_tops {
+            let top_lower = top.to_lowercase();
+            let mut score = 0;
+
+            if title_lower.contains("4k") && top_lower.contains("4k") { score += 50; }
+            if title_lower.contains("2k") && top_lower.contains("2k") { score += 50; }
+            if archive_stem.contains("4k") && top_lower.contains("4k") { score += 30; }
+            if archive_stem.contains("2k") && top_lower.contains("2k") { score += 30; }
+            if title_lower.contains("definitive") && top_lower.contains("definitive") { score += 20; }
+            if title_lower.contains("remaster") && top_lower.contains("remaster") { score += 20; }
+
+            if top_lower.contains("4k") || top_lower.contains("uhd") { score += 15; }
+            if top_lower.contains("2k") || top_lower.contains("1080p") || top_lower.contains("fhd") { score += 10; }
+            if top_lower.contains("hq") || top_lower.contains("high") { score += 8; }
+            if top_lower.contains("recommended") || top_lower.contains("default") { score += 25; }
+
+            variant_scores.push((top.clone(), score));
+        }
+
+        variant_scores.sort_by(|a, b| b.1.cmp(&a.1));
+        if let Some((best, _)) = variant_scores.first() {
+            chosen_variant = Some(best.clone());
+            let other_variants: Vec<String> = non_vanilla_tops
+                .iter()
+                .filter(|t| *t != best)
+                .cloned()
+                .collect();
+            warnings.push(format!(
+                "Archive contains multiple variants ({:?}). Automatically selected '{}' for optimal game quality and compatibility.",
+                other_variants, best
+            ));
+        }
+    }
+
+    let mut result = Vec::new();
+
+    // Case 1: Variant chosen
+    if let Some(ref variant) = chosen_variant {
+        if let Some(variant_entries) = top_level_map.get(variant) {
+            let prefix = format!("{}/", variant);
+            let prefix_win = format!("{}\\", variant);
+            for entry in variant_entries {
+                let norm = entry.path.replace('\\', "/");
+                let stripped = if norm.starts_with(&prefix) {
+                    norm[prefix.len()..].to_string()
+                } else if norm.starts_with(&prefix_win) {
+                    norm[prefix_win.len()..].to_string()
+                } else {
+                    norm
+                };
+
+                result.push(ResolvedArchiveEntry {
+                    archive_path: entry.path.clone(),
+                    normalized_subpath: stripped,
+                    size: entry.size,
+                });
+            }
+        }
+
+        for entry in root_files {
+            result.push(ResolvedArchiveEntry {
+                archive_path: entry.path.clone(),
+                normalized_subpath: entry.path.replace('\\', "/"),
+                size: entry.size,
+            });
+        }
+
+        return result;
+    }
+
+    // Case 2: Single non-vanilla top-level wrapper folder
+    if non_vanilla_tops.len() == 1 && root_files.iter().all(|r| {
+        let ext = Path::new(&r.path).extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+        ["txt", "md", "url", "pdf", "html"].contains(&ext.as_str())
+    }) {
+        let single_top = &non_vanilla_tops[0];
+        let prefix = format!("{}/", single_top);
+        let prefix_win = format!("{}\\", single_top);
+
+        for entry in &file_entries {
+            let norm = entry.path.replace('\\', "/");
+            let stripped = if norm.starts_with(&prefix) {
+                norm[prefix.len()..].to_string()
+            } else if norm.starts_with(&prefix_win) {
+                norm[prefix_win.len()..].to_string()
+            } else {
+                norm
+            };
+
+            result.push(ResolvedArchiveEntry {
+                archive_path: entry.path.clone(),
+                normalized_subpath: stripped,
+                size: entry.size,
+            });
+        }
+        return result;
+    }
+
+    // Case 3: Standard layout
+    for entry in file_entries {
+        result.push(ResolvedArchiveEntry {
+            archive_path: entry.path.clone(),
+            normalized_subpath: entry.path.replace('\\', "/"),
+            size: entry.size,
+        });
+    }
+
+    result
+}
+

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ArchiveInspection } from '../types';
+import React, { useState, useEffect } from 'react';
+import { ArchiveInspection, DownloadedArchiveItem } from '../types';
 import { api } from '../api/client';
 import { FileArchive, CheckCircle2, AlertTriangle, X, Search, Globe, DownloadCloud, Loader2 } from 'lucide-react';
 
@@ -20,6 +20,36 @@ export const ArchiveImportModal: React.FC<ArchiveImportModalProps> = ({
   const [downloadProgress, setDownloadProgress] = useState<string | null>(null);
   const [inspection, setInspection] = useState<ArchiveInspection | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [recentDownloads, setRecentDownloads] = useState<DownloadedArchiveItem[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      setLoadingRecent(true);
+      try {
+        const items = await api.getRecentDownloadedArchives();
+        if (isMounted) setRecentDownloads(items);
+      } catch (e) {
+        console.warn('Failed to load recent downloads:', e);
+      } finally {
+        if (isMounted) setLoadingRecent(false);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, []);
+
+  const handleBrowseArchive = async () => {
+    try {
+      const selected = await api.pickArchiveFile();
+      if (selected) {
+        setArchivePath(selected);
+        await handleInspectLocal(selected);
+      }
+    } catch (e: any) {
+      setError(typeof e === 'string' ? e : e?.message || 'File selection cancelled or failed');
+    }
+  };
 
   const handleInspectLocal = async (pathOverride?: string) => {
     const targetPath = (pathOverride || archivePath).trim();
@@ -32,7 +62,7 @@ export const ArchiveImportModal: React.FC<ArchiveImportModalProps> = ({
       const res = await api.inspectArchive(targetPath);
       setInspection(res);
       if (!modTitle.trim()) {
-        const guessedTitle = targetPath.split(/[\\/]/).pop()?.replace(/\.(zip|rar|7z)$/i, '').replace(/_/g, ' ') || 'Imported Mod';
+        const guessedTitle = targetPath.split(/[\\/]/).pop()?.replace(/\.(zip|rar|7z|asi|cs|cleo|dll)$/i, '').replace(/_/g, ' ') || 'Imported Mod';
         setModTitle(guessedTitle);
       }
     } catch (e: any) {
@@ -52,7 +82,7 @@ export const ArchiveImportModal: React.FC<ArchiveImportModalProps> = ({
 
     try {
       const tempId = `web_mod_${Date.now()}`;
-      const guessedTitle = url.split('/').pop()?.split('?')[0]?.replace(/\.(zip|rar|7z)$/i, '').replace(/_/g, ' ') || 'Web Mod';
+      const guessedTitle = url.split('/').pop()?.split('?')[0]?.replace(/\.(zip|rar|7z|asi|cs|cleo|dll)$/i, '').replace(/_/g, ' ') || 'Web Mod';
       
       const job = await api.startDownload(tempId, guessedTitle, 'web_import', 'web_import', url);
 
@@ -144,31 +174,84 @@ export const ArchiveImportModal: React.FC<ArchiveImportModalProps> = ({
 
         <div className="p-5 space-y-4">
           {importMode === 'local' ? (
-            <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1">
-                Local Archive File Path (ZIP, RAR, 7Z)
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={archivePath}
-                  onChange={(e) => setArchivePath(e.target.value)}
-                  placeholder="C:\Downloads\nissan_skyline_gtr34.zip"
-                  className="flex-1 bg-bg-main border border-border rounded px-3 py-1.5 text-xs text-white placeholder-neutral-500 font-mono focus:outline-none focus:border-accent"
-                />
+            <div className="space-y-4">
+              {recentDownloads.length > 0 && (
+                <div className="space-y-2 bg-bg-card border border-border rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] font-bold text-white flex items-center gap-1.5">
+                      <DownloadCloud className="w-3.5 h-3.5 text-accent" />
+                      <span>Auto-Detected in Downloads Folder</span>
+                    </div>
+                    <span className="text-[10px] text-neutral-400">Click any file to install</span>
+                  </div>
+                  <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                    {recentDownloads.map((item) => (
+                      <button
+                        key={item.absolutePath}
+                        type="button"
+                        onClick={() => {
+                          setArchivePath(item.absolutePath);
+                          handleInspectLocal(item.absolutePath);
+                        }}
+                        className={`w-full text-left p-2 rounded flex items-center justify-between border transition-all text-xs ${
+                          archivePath === item.absolutePath
+                            ? 'bg-accent/10 border-accent text-white'
+                            : 'bg-bg-subtle hover:bg-neutral-800/80 border-border text-neutral-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileArchive className="w-4 h-4 text-accent flex-shrink-0" />
+                          <span className="font-semibold truncate text-[11px]">{item.fileName}</span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0 pl-2">
+                          <span className="text-[10px] text-neutral-400">
+                            {(item.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB
+                          </span>
+                          <span className="text-[10px] font-semibold text-accent bg-accent/15 px-1.5 py-0.5 rounded">
+                            Select
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                  Or Select Local Archive Manually (ZIP, RAR, 7Z)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={archivePath}
+                    onChange={(e) => setArchivePath(e.target.value)}
+                    placeholder="C:\Downloads\mod_name.7z"
+                    className="flex-1 bg-bg-main border border-border rounded px-3 py-1.5 text-xs text-white placeholder-neutral-500 font-mono focus:outline-none focus:border-accent"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleBrowseArchive}
+                    disabled={inspecting}
+                    className="px-3 py-1.5 rounded text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-neutral-200 border border-neutral-700 flex items-center gap-1.5 transition-colors"
+                  >
+                    <Search className="w-3.5 h-3.5 text-accent" />
+                    <span>Browse...</span>
+                  </button>
                 <button
+                  type="button"
                   onClick={() => handleInspectLocal()}
                   disabled={inspecting || !archivePath.trim()}
                   className={`px-3 py-1.5 rounded text-xs font-semibold flex items-center gap-1.5 ${
                     archivePath.trim()
-                      ? 'bg-neutral-700 hover:bg-neutral-600 text-white'
+                      ? 'bg-accent hover:bg-accent-hover text-bg-main font-bold'
                       : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                   }`}
                 >
-                  <Search className="w-3.5 h-3.5" />
                   <span>{inspecting ? 'Inspecting...' : 'Inspect'}</span>
                 </button>
               </div>
+            </div>
             </div>
           ) : (
             <div>

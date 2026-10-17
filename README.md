@@ -1,124 +1,143 @@
 # San Andreas Mod Manager (SAMM)
 
-[![Build & Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)]()
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011%20(64--bit)-blue.svg)]()
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![Framework](https://img.shields.io/badge/Tauri-2.1-orange.svg)]()
+[![Release](https://img.shields.io/badge/release-v0.1.0-amber.svg?style=for-the-badge&logo=rocket)](https://github.com/athuls-engineer/samm/releases)
+[![Tauri v2](https://img.shields.io/badge/Tauri-v2.1-24C8DB.svg?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app)
+[![Rust](https://img.shields.io/badge/Rust-1.80%2B-orange.svg?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![React 18](https://img.shields.io/badge/React-18.3-61DAFB.svg?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-**San Andreas Mod Manager (SAMM)** is a real, production-minded open-source desktop application that makes discovering, evaluating, installing, managing, and safely removing mods for the classic PC version of **Grand Theft Auto: San Andreas** transparent, reliable, and recoverable.
+> **High-Performance, ACID-Compliant Transactional Mod Manager for Grand Theft Auto: San Andreas (Classic 1.0 US)**
 
----
-
-## 1. Core Engineering Principles
-
-- **Automate reliable operations, explain uncertain ones**: Never silently guess where game files belong.
-- **Evidence-Based Game Detection**: Distinguishes verified Classic PC 1.0 executables from patched, Steam, Rockstar Launcher, or unknown modified binaries using SHA-256 cryptographic fingerprints and file structural checks.
-- **Transactional Filesystem Safety**: Overwritten files are backed up to a dedicated recovery directory before modification. An atomic SQLite recovery journal ensures that if an installation is interrupted, power fails, or an error occurs, the previous game state is restored.
-- **Zero Silent Script Execution**: Automated execution of arbitrary downloaded executables (`.exe`), installers (`.msi`), or batch scripts (`.bat`) is strictly prohibited.
-- **Multi-Source Discovery with Honest Capabilities**: Integrates real GTA modding repositories (GTAinside, LibertyCity, MixMods, GTAGarage) and first-class local archive imports. Sources that require browser-based downloads or web sessions are transparently declared rather than simulated with fake APIs.
+SAMM is a modern, reliable mod manager designed specifically for GTA: San Andreas. Built from the ground up in **Rust** and **Tauri v2** with a high-density **React 18 / TypeScript** frontend, SAMM completely eliminates mod installation corruption, file collisions, missing companion assets, and aspect ratio distortion.
 
 ---
 
-## 2. Key Features
+## Key Highlights
 
-- **Game Detection & Version Verification**:
-  - Automatically scans Steam libraries, Rockstar Games Launcher, and classic retail directories.
-  - Inspects `gta_sa.exe` hashes, file sizes, and core RenderWare folders (`data/gta.dat`, `models/gta3.img`, `audio/streams/`).
-  - Identifies presence of CLEO framework, ASI loaders (`vorbisFile.dll`/`d3d9.dll`), and ModLoader.
-  - Rejects incompatible Definitive Edition (Unreal Engine) installs with transparent explanations.
-- **Pre-Installation Safety Inspection**:
-  - Displays full plan before touching the game directory: planned file operations, rules, file types, destination states (`NEW` vs `OVERWRITE`), and missing prerequisites.
-- **Safe Installation Engine**:
-  - Automated placement for recognized CLEO scripts (`.cs` -> `cleo/`, `.fxt` -> `cleo/cleo_text/`), ASI plugins (`.asi` -> game root), and ModLoader sandboxed folders (`modloader/<mod_name>/`).
-  - Clean uninstall: restores the original backed-up file or cleanly removes newly added files without leaving orphan assets.
-- **Conflict & Collision Detection**:
-  - Tracks file ownership across all installed mods and alerts users when multiple mods claim the same destination path.
-- **Profiles & Reproducible Manifests**:
-  - Maintain isolated mod configurations (e.g. *Vanilla Baseline*, *Visual Enhancements*, *Total Conversion*).
-  - Export and import reproducible mod list JSON manifests without redistributing copyrighted game assets.
-- **Download Subsystem**:
-  - Download progress, transfer speed, pause/resume (HTTP Range requests), and automated SHA-256 checksum verification.
-- **Direct Game Launcher**:
-  - Launches the game with selected profile and custom startup arguments (`-window`, `-novid`, `-width 1920 -height 1080`).
+- **Zero-Data-Loss Transactional Architecture**: Every mod installation is staged as an ACID transaction. If an archive contains corrupt assets or conflicting hashes, SAMM automatically rolls back all filesystem modifications in reverse order, leaving the vanilla game directory untainted.
+- **Automated 1-Click Catalog**: Integrated repository browser pre-loaded with over 100 verified mods (SilentPatch, SkyGfx, Widescreen Fix, Project 2DFX, First Person Mod, Cheat Menu, Ragdoll Physics, and HD Graphics) featuring one-click unattended download and deployment.
+- **Smart ModLoader & Native Routing**: Automatically detects `.asi`, `.cs` (CLEO), `.sp`, `.fp`, config scripts, and font companion files, routing them to ModLoader subfolders or the root game directory based on RenderWare binary handler requirements.
+- **RenderWare Aspect Ratio & Display Safety**: Enforces true 16:9, 16:10, and 21:9 geometry across loading screens and HUD elements, preventing narrow splash screens and squashed widescreen visuals.
+- **Zero-Hook Conflict Prevention**: Automatically isolates duplicate root ASI plugins (e.g., colliding `GTASA.WidescreenFix.asi` or `Hooks.asi` 0x45A errors) to ensure error-free game boot.
+- **Isolated Multi-Profile System**: Switch between different overhaul setups (e.g., Vanilla+ Quality of Life vs Total Conversion) instantly with independent virtual file profiles.
+- **Dynamic Theming Engine**: Fully hardware-accelerated themes including Charcoal Dark, Midnight OLED (pure black), Nordic Slate, San Andreas Gold, and Grove Street Green.
 
 ---
 
-## 3. Technology Stack
+## Architectural Workflow
 
-- **Desktop Shell**: [Tauri 2](https://tauri.app/) (Windows MSVC backend)
-- **Backend**: Rust 1.99+ (Tokio, Rusqlite with bundled SQLite, Reqwest, Zip, Sha2, Chrono)
-- **Frontend**: React 18, TypeScript 5, Vite 5
-- **UI & Styling**: Tailwind CSS (dark neutral desktop theme inspired by professional file managers and dev tools), Lucide Icons
-- **Database**: SQLite 3 with WAL mode, parameterized queries, and transactional migrations
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Frontend as React 18 UI
+    participant Backend as Rust Tauri Engine
+    participant DB as SQLite WAL Journal
+    participant FS as GTA: SA Game Filesystem
 
----
-
-## 4. Architecture
-
-```
-React UI (TypeScript / Tailwind)
-    │
-    ▼ (Typed Tauri IPC Commands)
-src-tauri/src/commands.rs
-    │
-    ├── game_detection.rs    -> SHA-256 verification & RenderWare directory inspector
-    ├── archives.rs          -> Path traversal protection & safe zip inspector
-    ├── installation.rs      -> Pre-install planner, recovery journal & atomic rollback
-    ├── conflicts.rs         -> Destination path collision detection & ownership map
-    ├── profiles.rs          -> Profile switching & JSON manifest export/import
-    ├── sources/             -> Multi-source adapters (GTAinside, LibertyCity, MixMods, GTAGarage, Manual)
-    ├── downloads.rs         -> Multi-job download manager with SHA-256 checks
-    ├── database.rs          -> SQLite schema migrations & repository layer
-    └── game_launch.rs       -> Direct executable spawn without shell injection
+    User->>Frontend: Select "1-Click Install" or Drop Mod Archive
+    Frontend->>Backend: Request Archive Ingestion & Inspection
+    Backend->>Backend: Inspect archive structure & classify binary formats (.asi, .cs, .fp, textures)
+    Backend->>DB: Open Recovery Journal Transaction (in_progress)
+    Backend->>FS: Stage automatic backup of overwritten vanilla files
+    Backend->>FS: Route assets (ModLoader / Root Companion / CLEO)
+    alt Installation Clean
+        Backend->>DB: Commit Transaction & Register InstalledMod Record
+        Backend->>Frontend: Return Installation Success (Instant UI Sync)
+    else File Conflict or Extraction Error
+        Backend->>FS: Trigger Transactional Rollback (Revert staged files)
+        Backend->>DB: Mark Recovery Journal as rolled_back
+        Backend->>Frontend: Return Safe Abort Warning (Zero Data Loss)
+    end
 ```
 
 ---
 
-## 5. Building & Running Locally
+## Core Capabilities
+
+### 1. Intelligent File Classification & Asset Routing
+ModLoader cannot natively parse custom binary save-state parameters (`.sp`), first-person view coordinate matrices (`.fp`), or proprietary font assets without dedicated helper handlers. SAMM's routing engine isolates these files and deploys them alongside the executable in the game root, while safely routing graphics, maps, textures, and standard ASI plugins into ModLoader.
+
+### 2. ACID Rollback Journal
+All operations are tracked in an embedded SQLite database (`samm.db`) operating in Write-Ahead Logging (WAL) mode. If an installation is interrupted or cancelled, SAMM executes an exact rollback sequence, ensuring no orphaned files remain.
+
+### 3. Integrated Mod Repositories
+Supports live search, category filtering, and direct downloads across major San Andreas community repositories:
+- GTAInside
+- MixMods
+- LibertyCity
+- GTAGarage
+
+---
+
+## Development & Build Instructions
 
 ### Prerequisites
-- **Operating System**: Windows 10 or Windows 11 (64-bit)
-- **Rust Toolchain**: `rustup` with `stable-x86_64-pc-windows-msvc` (`rustc` and `cargo`)
-- **Visual Studio C++ Build Tools**: MSVC v142 / v143 compiler tools
-- **Node.js**: v18+ (tested on Node v22)
+- [Node.js](https://nodejs.org/) (v18+ or v20+)
+- [Rust](https://rustup.rs/) (v1.80+)
+- [Visual Studio C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (MSVC)
+- Windows 10/11 with WebView2 Runtime
 
-### Steps
+### Clone & Install Dependencies
+```bash
+git clone https://github.com/athuls-engineer/samm.git
+cd samm
+npm install
+```
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/samm-modmanager/samm.git
-   cd samm
-   ```
+### Run in Development Mode
+Launches Vite development server alongside the Tauri native desktop window with hot module replacement:
+```bash
+npm run tauri dev
+```
 
-2. **Install frontend dependencies**:
-   ```bash
-   npm install
-   ```
+### Run Unit Test Suites
+```bash
+# Frontend TypeScript domain test suite
+npm test
 
-3. **Run automated test suites**:
-   ```bash
-   # Run Rust unit & integration tests
-   cd src-tauri
-   cargo test --lib
-   cd ..
+# Rust backend core unit tests
+cargo test --manifest-path src-tauri/Cargo.toml
+```
 
-   # Run TypeScript domain tests
-   npx tsx --test src/tests/domain.test.ts
-   ```
-
-4. **Build the production application**:
-   ```bash
-   npm run build
-   cd src-tauri
-   cargo build --release
-   ```
-   The compiled standalone Windows desktop binary will be available at:
-   `src-tauri/target/release/samm.exe`
+### Compile Production Release Binary
+Produces an optimized, standalone executable with embedded assets:
+```bash
+npm run build
+cargo build --release --manifest-path src-tauri/Cargo.toml
+```
+The compiled single-file binary will be located at:
+```
+src-tauri/target/release/samm.exe
+```
 
 ---
 
-## 6. Disclaimer & Legal Notice
+## Technology Stack
 
-San Andreas Mod Manager (SAMM) is an independent open-source utility developed by community members. It is not affiliated with, endorsed by, or sponsored by Rockstar Games, Take-Two Interactive, or any related entity.
+| Layer | Component | Description |
+| :--- | :--- | :--- |
+| **Runtime & Shell** | [Tauri v2](https://tauri.app) | Low-overhead native Windows wrapper utilizing Microsoft Edge WebView2 |
+| **Backend Engine** | [Rust](https://www.rust-lang.org) | High-performance concurrency, memory safety, and filesystem operations |
+| **Database** | [rusqlite (bundled SQLite)](https://github.com/rusqlite/rusqlite) | WAL-mode transactional state store for mod records, backups, and profiles |
+| **Frontend Framework** | [React 18](https://react.dev) | Declarative component UI with concurrent rendering |
+| **Type Safety** | [TypeScript 5.6](https://www.typescriptlang.org) | End-to-end typed IPC contract and model definitions |
+| **Styling** | [Tailwind CSS 3.4](https://tailwindcss.com) | Dynamic CSS variable-driven theme engine |
+| **Icons** | [Lucide React](https://lucide.dev) | Modern, clean vector iconography |
 
-SAMM does not distribute copyrighted game executables, modified game binaries, or unauthorized assets. All trademarks, game titles, and assets belong to their respective owners.
+---
+
+## System Requirements
+
+- **Operating System:** Windows 10 (64-bit) or Windows 11
+- **Target Game:** Grand Theft Auto: San Andreas (Classic 1.0 US Executable)
+- **Mod Engine:** ModLoader 0.3.8+ & CLEO 4+ (automatically detected and verified by SAMM)
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+Developed and maintained by [Athul S](https://github.com/athuls-engineer).

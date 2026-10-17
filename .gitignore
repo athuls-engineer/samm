@@ -1,15 +1,23 @@
-# Rust / Cargo
+# Binaries & Build Artifacts
+*.exe
+*.dll
+*.pdb
+*.so
+*.dylib
 src-tauri/target/
 **/*.rs.bk
 Cargo.lock
 
-# Node / Web
+# Node / Frontend Build
 node_modules/
 dist/
 dist-ssr/
 *.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Editor & OS
+# Editor & System
 .vscode/
 .idea/
 *.suo
@@ -20,6 +28,22 @@ dist-ssr/
 .DS_Store
 Thumbs.db
 
-# SAMM Runtime Local Data
+# SAMM Runtime Local Data & Database
 **/SAMM/
 **/*.part
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# Scrape / Scratch Utility Scripts & Data
+*.py
+*.pyc
+__pycache__/
+all_github_assets.json
+curated_suite_*.json
+discovered_assets.json
+repo_assets.json
+search_repos.json
+verified_*.json
+generated_catalog_code.rs

@@ -234,6 +234,14 @@ pub struct FileConflict {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ConflictResolutionResult {
+    pub resolved_count: usize,
+    pub actions_taken: Vec<String>,
+    pub remaining_conflicts: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BackupRecord {
     pub id: String,
     pub game_installation_id: String,
@@ -277,6 +285,13 @@ pub struct DiagnosticReport {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CacheCleanupResult {
+    pub files_removed: usize,
+    pub bytes_freed: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub default_game_installation_id: Option<String>,
     pub download_directory: String,
@@ -286,4 +301,9 @@ pub struct AppSettings {
     pub auto_check_updates: bool,
     pub theme: String,
     pub log_level: String,
+    pub default_launch_args: Option<String>,
+    pub default_aspect_ratio: Option<String>,
+    pub auto_resolve_conflicts: Option<bool>,
+    pub auto_detect_game_on_startup: Option<bool>,
 }
+

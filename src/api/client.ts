@@ -12,6 +12,9 @@ import {
   BackupRecord,
   DiagnosticReport,
   AppSettings,
+  DownloadedArchiveItem,
+  ConflictResolutionResult,
+  CacheCleanupResult,
 } from '../types';
 
 export const api = {
@@ -132,6 +135,24 @@ export const api = {
     return await invoke('get_conflicts', { gameId });
   },
 
+  resolveConflict: async (
+    gameId: string,
+    destinationRelPath: string,
+    keepModId: string,
+    yieldModId: string
+  ): Promise<void> => {
+    return await invoke('resolve_conflict', {
+      gameId,
+      destinationRelPath,
+      keepModId,
+      yieldModId,
+    });
+  },
+
+  autoResolveConflicts: async (gameId: string): Promise<ConflictResolutionResult> => {
+    return await invoke('auto_resolve_conflicts', { gameId });
+  },
+
   getBackups: async (gameId: string): Promise<BackupRecord[]> => {
     return await invoke('get_backups', { gameId });
   },
@@ -174,5 +195,53 @@ export const api = {
 
   saveSettings: async (settings: AppSettings): Promise<void> => {
     return await invoke('save_settings', { settings });
+  },
+
+  clearDownloadCache: async (downloadDir?: string): Promise<CacheCleanupResult> => {
+    return await invoke('clear_download_cache', { downloadDir: downloadDir || null });
+  },
+
+  purgeStaleBackups: async (gameId?: string): Promise<CacheCleanupResult> => {
+    return await invoke('purge_stale_backups', { gameId: gameId || null });
+  },
+
+  syncExistingMods: async (gameId: string): Promise<InstalledMod[]> => {
+    return await invoke('sync_existing_mods', { gameId });
+  },
+
+  pickFolder: async (): Promise<string | null> => {
+    return await invoke('pick_folder');
+  },
+
+  pickArchiveFile: async (): Promise<string | null> => {
+    return await invoke('pick_archive_file');
+  },
+
+  openPathInExplorer: async (targetPath: string): Promise<void> => {
+    return await invoke('open_path_in_explorer', { targetPath });
+  },
+
+  openUrl: async (url: string): Promise<void> => {
+    return await invoke('open_url_in_browser', { url });
+  },
+
+  isGameProcessRunning: async (gameId: string): Promise<boolean> => {
+    return await invoke('is_game_process_running', { gameId });
+  },
+
+  killGameProcess: async (gameId: string): Promise<void> => {
+    return await invoke('kill_game_process', { gameId });
+  },
+
+  batchToggleMods: async (gameId: string, modIds: string[], enabled: boolean): Promise<void> => {
+    return await invoke('batch_toggle_mods', { gameId, modIds, enabled });
+  },
+
+  batchUninstallMods: async (gameId: string, modIds: string[]): Promise<void> => {
+    return await invoke('batch_uninstall_mods', { gameId, modIds });
+  },
+
+  getRecentDownloadedArchives: async (): Promise<DownloadedArchiveItem[]> => {
+    return await invoke('get_recent_downloaded_archives');
   },
 };

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ModRecord } from '../types';
+import { api } from '../api/client';
 import {
   X,
   ExternalLink,
@@ -173,16 +174,16 @@ export const ModDetailsModal: React.FC<ModDetailsModalProps> = ({
                     href={mod.pageUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-accent hover:underline flex items-center gap-1.5 font-semibold"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      api.openUrl(mod.pageUrl);
+                    }}
+                    className="text-accent hover:underline flex items-center gap-1.5 font-semibold cursor-pointer"
                   >
-                    <span>View original mod page on {mod.sourceId}</span>
+                    <span>View mod page on {mod.sourceId}</span>
                     <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </div>
-              </div>
-
-              <div className="p-3 bg-neutral-900 border border-neutral-800 rounded text-[11px] text-neutral-400">
-                SAMM is an independent open-source tool and is not affiliated with or endorsed by Rockstar Games or Take-Two Interactive.
               </div>
             </div>
           )}
@@ -194,10 +195,14 @@ export const ModDetailsModal: React.FC<ModDetailsModalProps> = ({
             href={mod.pageUrl}
             target="_blank"
             rel="noreferrer"
-            className="px-4 py-1.5 rounded text-xs font-semibold text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors flex items-center gap-1.5"
+            onClick={(e) => {
+              e.preventDefault();
+              api.openUrl(mod.pageUrl);
+            }}
+            className="px-4 py-1.5 rounded text-xs font-semibold text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors flex items-center gap-1.5 cursor-pointer"
           >
             <ExternalLink className="w-3.5 h-3.5" />
-            <span>Open Source Website</span>
+            <span>Open Mod Page</span>
           </a>
 
           <div className="flex items-center gap-2">
@@ -208,7 +213,7 @@ export const ModDetailsModal: React.FC<ModDetailsModalProps> = ({
                   className="px-3 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700 text-xs font-medium rounded flex items-center gap-1.5 transition-colors"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Download Only</span>
+                  <span>Download Archive</span>
                 </button>
 
                 <button
@@ -223,7 +228,7 @@ export const ModDetailsModal: React.FC<ModDetailsModalProps> = ({
                   className="px-5 py-2 bg-accent hover:bg-accent-hover text-bg-main text-xs font-bold rounded flex items-center gap-1.5 transition-colors shadow"
                 >
                   <Zap className="w-4 h-4 fill-current" />
-                  <span>⚡ 1-Click Install into GTA SA</span>
+                  <span>1-Click Install</span>
                 </button>
               </>
             ) : (
@@ -231,10 +236,14 @@ export const ModDetailsModal: React.FC<ModDetailsModalProps> = ({
                 href={mod.pageUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-semibold rounded flex items-center gap-1.5 transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  api.openUrl(mod.pageUrl);
+                }}
+                className="px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-semibold rounded flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <ExternalLink className="w-4 h-4" />
-                <span>Download on Website</span>
+                <span>Open Mod Page</span>
               </a>
             )}
           </div>

@@ -1,10 +1,9 @@
 use std::path::{Path, PathBuf};
-use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::sync::{Arc, Mutex};
-use sha2::{Digest, Sha256};
 use reqwest::Client;
-use reqwest::header::{RANGE, CONTENT_LENGTH};
+use reqwest::header::RANGE;
 use crate::models::DownloadJob;
 use crate::database::Database;
 
@@ -105,15 +104,32 @@ impl DownloadManager {
         while retry_count < max_retries {
             match self.execute_chunked_download(&job_id, &url, &target_path).await {
                 Ok(_) => {
+                    // Small delay to ensure Windows OS file handles are completely released
+                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
                     // Finalize download: compute complete SHA-256 and rename .part -> .zip safely
-                    let final_path = target_path.with_extension(""); // removes .part
+                    let final_path = if target_path.to_string_lossy().ends_with(".part") {
+                        PathBuf::from(target_path.to_string_lossy().trim_end_matches(".part"))
+                    } else {
+                        target_path.with_extension("")
+                    };
+
                     if final_path.exists() {
                         let _ = fs::remove_file(&final_path);
                     }
-                    let actual_path = if fs::rename(&target_path, &final_path).is_ok() {
-                        final_path
-                    } else {
-                        target_path.clone()
+                    let actual_path = match fs::rename(&target_path, &final_path) {
+                        Ok(_) => final_path,
+                        Err(e) => {
+                            tracing::warn!("Rename failed, falling back to copy/original: {}", e);
+                            if fs::copy(&target_path, &final_path).is_ok() {
+                                let _ = fs::remove_file(&target_path);
+                                final_path
+                            } else if final_path.exists() {
+                                final_path
+                            } else {
+                                target_path.clone()
+                            }
+                        }
                     };
 
                     let (computed_hash, total_size) = crate::game_detection::compute_file_sha256(&actual_path)
@@ -217,6 +233,9 @@ impl DownloadManager {
                 bytes_since_last_update = 0;
             }
         }
+
+        file.flush().map_err(|e| format!("Disk flush error: {}", e))?;
+        drop(file);
 
         Ok(())
     }

@@ -16,7 +16,8 @@ import {
   RotateCcw,
   Loader2,
   ShieldCheck,
-  Sparkles,
+  Star,
+  Flame,
 } from 'lucide-react';
 
 interface DiscoverModsProps {
@@ -41,9 +42,10 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [selectedSource, setSelectedSource] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedCategory, setSelectedCategory] = useState<string>('Essential & Popular');
+  const [filterDirectOnly, setFilterDirectOnly] = useState(false);
   const [mods, setMods] = useState<ModRecord[]>(() => {
-    return modResultsCache.get('All_all_') || [];
+    return modResultsCache.get('Essential & Popular_all_') || modResultsCache.get('All_all_') || [];
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,19 +87,20 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
   }, [query, selectedSource, selectedCategory]);
 
   const quickFilterTabs = [
-    { id: 'All', label: 'All Mods (220+ Classics)' },
-    { id: 'Plugins / ASI', label: '⚡ ASI & Engine Fixes' },
-    { id: 'Total Conversions', label: '🌍 Total Conversions & Maps' },
-    { id: 'Graphics / Plugins', label: '🎨 PS2 Graphics & Shaders' },
-    { id: 'Graphics / Textures', label: '🖼️ HD World & Textures' },
-    { id: 'Skins / Models', label: '👤 HD Skins & Characters' },
-    { id: 'Weapons / Assets', label: '🔫 Weapons & Arsenal' },
-    { id: 'Scripts / CLEO', label: '📜 CLEO Scripts' },
-    { id: 'Tools / Frameworks', label: '🛠️ Loaders & Frameworks' },
-    { id: 'Gameplay / Scripts', label: '🎮 Gameplay & Overhauls' },
-    { id: 'Vehicles / Assets', label: '🚗 Vehicles & Supercars' },
-    { id: 'Audio / Sounds', label: '🎵 Radio & Soundpacks' },
-    { id: 'Tools', label: '🔧 Standalone Editors' },
+    { id: 'Essential & Popular', label: 'Essential & Popular' },
+    { id: 'All', label: 'All Mods' },
+    { id: 'Plugins / ASI', label: 'ASI & Engine Fixes' },
+    { id: 'Total Conversions', label: 'Total Conversions & Maps' },
+    { id: 'Graphics / Plugins', label: 'Graphics, Shaders & Lighting' },
+    { id: 'Graphics / Textures', label: 'HD Textures & World' },
+    { id: 'Skins / Models', label: 'Characters & Pedestrians' },
+    { id: 'Weapons / Assets', label: 'Weapons & Arsenal' },
+    { id: 'Scripts / CLEO', label: 'CLEO Scripts' },
+    { id: 'Tools / Frameworks', label: 'Loaders & Frameworks' },
+    { id: 'Gameplay / Scripts', label: 'Gameplay & Physics' },
+    { id: 'Vehicles / Assets', label: 'Vehicles & Handling' },
+    { id: 'Audio / Sounds', label: 'Audio & Sounds' },
+    { id: 'Tools', label: 'Modding Tools' },
   ];
 
   const getSourceBadgeColor = (sourceId: string) => {
@@ -119,8 +122,13 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
     return installedMods.some((m) => m.id === modId);
   };
 
+  const directInstallCount = mods.filter((m) => Boolean(m.downloadUrl)).length;
+  const displayedMods = filterDirectOnly
+    ? mods.filter((m) => Boolean(m.downloadUrl))
+    : mods;
+
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 md:p-8 space-y-5 max-w-7xl mx-auto">
       {/* Header and Quick Stats */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-subtle pb-5">
         <div>
@@ -131,7 +139,7 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
             </span>
           </div>
           <p className="text-xs text-neutral-400 mt-1">
-            Browse the canonical GTA SA modding library, or import from the <strong>100,000+ community mods</strong> on GTAinside and LibertyCity. Click <strong className="text-amber-400">⚡ 1-Click Install</strong> to auto-deploy into your active game directory.
+            Browse verified GTA: San Andreas mods with transactional installation, automatic backup, and conflict prevention.
           </p>
         </div>
 
@@ -144,45 +152,62 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
         </button>
       </div>
 
+
+
       {/* Filter and Search Bar */}
       <div className="space-y-3">
-        {/* Category Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
-          {quickFilterTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setSelectedCategory(tab.id)}
-              className={`px-3 py-1.5 rounded-md font-medium whitespace-nowrap transition-colors text-xs ${
-                selectedCategory === tab.id
-                  ? 'bg-accent text-bg-main font-bold shadow-sm'
-                  : 'bg-bg-card hover:bg-neutral-800 text-neutral-300 border border-border'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        {/* Category Pills & Quick 1-Click Toggle */}
+        <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar flex-1">
+            {quickFilterTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setSelectedCategory(tab.id)}
+                className={`h-9 px-3.5 rounded-md font-semibold whitespace-nowrap transition-colors text-xs flex items-center cursor-pointer ${
+                  selectedCategory === tab.id
+                    ? 'bg-accent text-bg-main font-bold shadow-sm'
+                    : 'bg-bg-card hover:bg-neutral-800 text-neutral-300 border border-border'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setFilterDirectOnly(!filterDirectOnly)}
+            className={`h-9 px-3.5 rounded-md font-bold whitespace-nowrap transition-all text-xs flex items-center gap-1.5 border flex-shrink-0 cursor-pointer ${
+              filterDirectOnly
+                ? 'bg-amber-500 text-neutral-950 border-amber-400 shadow-md ring-1 ring-amber-400'
+                : 'bg-neutral-900 hover:bg-neutral-800 text-amber-400 border-amber-800/60'
+            }`}
+            title="Show only mods with direct 1-click automated installation"
+          >
+            <Zap className="w-3.5 h-3.5 fill-current" />
+            <span>1-Click Ready Only ({directInstallCount})</span>
+          </button>
         </div>
 
         {/* Inputs row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-bg-card border border-border p-2.5 rounded-lg">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-bg-card border border-border p-2 rounded-lg">
           {/* Search box */}
-          <div className="md:col-span-3 relative">
-            <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" />
+          <div className="md:col-span-3 relative flex items-center">
+            <Search className="w-4 h-4 text-neutral-400 absolute left-3 pointer-events-none" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by mod name, author, or feature (e.g. SilentPatch, SkyGfx, Widescreen, Limit Adjuster)..."
-              className="w-full bg-bg-main border border-border rounded pl-9 pr-3 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-accent"
+              className="w-full h-9 bg-bg-main border border-border rounded pl-9 pr-3 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-accent"
             />
           </div>
 
           {/* Source selector */}
-          <div className="relative">
+          <div className="relative flex items-center">
             <select
               value={selectedSource}
               onChange={(e) => setSelectedSource(e.target.value)}
-              className="w-full bg-bg-main border border-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-accent appearance-none cursor-pointer"
+              className="w-full h-9 bg-bg-main border border-border rounded px-3 pr-8 text-xs text-white focus:outline-none focus:border-accent appearance-none cursor-pointer"
             >
               <option value="all">All Mod Repositories</option>
               {sources.map((s) => (
@@ -191,7 +216,7 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
                 </option>
               ))}
             </select>
-            <Filter className="w-3.5 h-3.5 text-neutral-400 absolute right-3 top-2.5 pointer-events-none" />
+            <Filter className="w-3.5 h-3.5 text-neutral-400 absolute right-3 pointer-events-none" />
           </div>
         </div>
       </div>
@@ -199,8 +224,9 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
       {/* Catalog Status */}
       <div className="flex items-center justify-between text-xs text-neutral-400">
         <div>
-          Showing <span className="text-white font-semibold">{mods.length}</span> verified mods
+          Showing <span className="text-white font-semibold">{displayedMods.length}</span> verified mods
           {selectedCategory !== 'All' && <span> in <span className="text-accent">{selectedCategory}</span></span>}
+          {filterDirectOnly && <span className="text-amber-400 font-semibold"> (1-Click Only)</span>}
         </div>
         {loading && (
           <div className="flex items-center gap-1.5 text-accent text-xs">
@@ -217,9 +243,11 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
         </div>
       )}
 
+
+
       {/* Mod Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {mods.map((mod) => {
+        {displayedMods.map((mod) => {
           const autoStatus = autoInstallStates[mod.id];
           const isInstalled = isModInstalled(mod.id);
           const isBusy = autoStatus && (autoStatus.step === 'downloading' || autoStatus.step === 'planning' || autoStatus.step === 'installing');
@@ -227,63 +255,86 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
           return (
             <div
               key={mod.id}
-              className={`bg-bg-card border rounded-lg p-4 flex flex-col justify-between transition-all duration-150 relative overflow-hidden ${
+              className={`bg-bg-card border rounded-lg p-4 flex flex-col justify-between transition-all duration-150 relative overflow-hidden min-h-[350px] ${
                 isInstalled
                   ? 'border-emerald-800/80 bg-bg-card/90'
                   : 'border-border hover:border-neutral-500'
               }`}
             >
               {/* Card Header & Content */}
-              <div className="space-y-2.5">
+              <div className="space-y-2.5 flex-1 flex flex-col">
                 {/* Badges strip */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded border ${getSourceBadgeColor(mod.sourceId)}`}>
-                    {mod.sourceId}
-                  </span>
+                <div className="h-6 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded border leading-none flex items-center ${getSourceBadgeColor(mod.sourceId)}`}>
+                      {mod.sourceId}
+                    </span>
+                    {mod.downloadUrl ? (
+                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/80 flex items-center gap-1 leading-none">
+                        <Zap className="w-2.5 h-2.5 fill-current" /> 1-Click
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-neutral-900 text-neutral-400 border border-neutral-800 flex items-center gap-1 leading-none">
+                        <ExternalLink className="w-2.5 h-2.5" /> Web Page
+                      </span>
+                    )}
+                  </div>
 
-                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700">
+                  <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700 leading-none flex items-center">
                     {mod.installationStrategy.toUpperCase()}
                   </span>
                 </div>
 
                 {/* Title and Author */}
-                <div>
+                <div className="space-y-0.5">
                   <h3
-                    className="text-sm font-bold text-white hover:text-accent cursor-pointer transition-colors leading-snug"
+                    className="text-sm font-bold text-white hover:text-accent cursor-pointer transition-colors leading-snug line-clamp-2 h-10 flex items-start"
                     onClick={() => onSelectMod(mod)}
+                    title={mod.title}
                   >
                     {mod.title}
                   </h3>
-                  <div className="text-[11px] text-neutral-400 mt-0.5">
+                  <div className="text-[11px] text-neutral-400 truncate h-4">
                     By <span className="text-neutral-300 font-medium">{mod.author}</span>
                   </div>
                 </div>
 
                 {/* Description */}
-                <p className="text-xs text-neutral-300 line-clamp-2 leading-relaxed">
+                <p className="text-xs text-neutral-300 line-clamp-2 leading-relaxed h-9 overflow-hidden">
                   {mod.description}
                 </p>
 
                 {/* Tags & Baseline Info */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[10px]">
+                <div className="h-7 flex items-center gap-1.5 overflow-hidden text-[10px] mt-auto">
+                  {mod.tags.some((t) => t.toLowerCase() === 'essential') && (
+                    <span className="flex items-center gap-1 text-amber-300 bg-amber-950/80 border border-amber-700/80 px-1.5 py-0.5 rounded font-bold shadow-sm whitespace-nowrap">
+                      <Star className="w-3 h-3 fill-current text-amber-400" /> Essential
+                    </span>
+                  )}
+                  {mod.tags.some((t) => t.toLowerCase() === 'popular') && (
+                    <span className="flex items-center gap-1 text-rose-300 bg-rose-950/80 border border-rose-800/80 px-1.5 py-0.5 rounded font-bold shadow-sm whitespace-nowrap">
+                      <Flame className="w-3 h-3 fill-current text-rose-400" /> Popular
+                    </span>
+                  )}
+
                   {mod.confidence === 'confirmed' ? (
-                    <span className="flex items-center gap-1 text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-1.5 py-0.5 rounded font-semibold">
-                      <CheckCircle2 className="w-3 h-3" /> 1.0 US Verified
+                    <span className="flex items-center gap-1 text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
+                      <CheckCircle2 className="w-3 h-3" /> 1.0 US
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1 text-blue-400 bg-blue-950/60 border border-blue-800/80 px-1.5 py-0.5 rounded font-semibold">
+                    <span className="flex items-center gap-1 text-blue-400 bg-blue-950/60 border border-blue-800/80 px-1.5 py-0.5 rounded font-semibold whitespace-nowrap">
                       <HelpCircle className="w-3 h-3" /> Compatible
                     </span>
                   )}
 
                   {mod.fileSizeFormatted && (
-                    <span className="text-neutral-400 font-mono bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded">
+                    <span className="text-neutral-400 font-mono bg-neutral-900 border border-neutral-800 px-1.5 py-0.5 rounded whitespace-nowrap">
                       {mod.fileSizeFormatted}
                     </span>
                   )}
 
                   {isInstalled && (
-                    <span className="text-emerald-300 font-semibold bg-emerald-900/60 border border-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <span className="text-emerald-300 font-semibold bg-emerald-900/60 border border-emerald-700 px-1.5 py-0.5 rounded flex items-center gap-1 whitespace-nowrap">
                       <CheckCircle2 className="w-3 h-3" /> Installed
                     </span>
                   )}
@@ -318,11 +369,11 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
                 )}
 
                 {/* Action Buttons Row */}
-                <div className="flex items-center justify-between gap-2">
+                <div className="h-8 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-1.5">
                     <button
                       onClick={() => onSelectMod(mod)}
-                      className="px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-xs text-neutral-300 font-medium flex items-center gap-1 transition-colors"
+                      className="h-8 px-2.5 rounded bg-neutral-800 hover:bg-neutral-700 text-xs text-neutral-300 font-medium flex items-center gap-1 transition-colors cursor-pointer"
                       title="Inspect Mod details, requirements & files"
                     >
                       <Info className="w-3.5 h-3.5" />
@@ -333,8 +384,12 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
                       href={mod.pageUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="p-1.5 rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
-                      title="Open source website"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        api.openUrl(mod.pageUrl);
+                      }}
+                      className="h-8 w-8 flex items-center justify-center rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors cursor-pointer"
+                      title="Open source website in browser"
                     >
                       <ExternalLink className="w-3.5 h-3.5" />
                     </a>
@@ -345,7 +400,7 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
                     <button
                       onClick={() => onOneClickInstall(mod)}
                       disabled={isBusy}
-                      className={`px-3.5 py-1.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all shadow ${
+                      className={`h-8 px-3.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all shadow cursor-pointer ${
                         isBusy
                           ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                           : isInstalled
@@ -375,10 +430,15 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
                       href={mod.pageUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="px-2.5 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-300 text-xs font-semibold flex items-center gap-1 transition-colors"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        api.openUrl(mod.pageUrl);
+                      }}
+                      className="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Open mod page in browser"
                     >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      <span>On Website</span>
+                      <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
+                      <span>Open Mod Page</span>
                     </a>
                   )}
                 </div>

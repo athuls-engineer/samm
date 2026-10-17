@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "San Andreas Mod Manager (SAMM)",
         "width": 1280,
         "height": 840,

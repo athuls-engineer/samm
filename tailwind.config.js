@@ -9,21 +9,21 @@ export default {
     extend: {
       colors: {
         bg: {
-          main: "#0f1115",
-          subtle: "#16181d",
-          card: "#1c1f26",
-          hover: "#252932",
-          active: "#2e333e",
+          main: "var(--bg-main, #0f1115)",
+          subtle: "var(--bg-subtle, #16181d)",
+          card: "var(--bg-card, #1c1f26)",
+          hover: "var(--bg-hover, #252932)",
+          active: "var(--bg-active, #2e333e)",
         },
         border: {
-          subtle: "#2a2e39",
-          DEFAULT: "#383e4d",
-          strong: "#4f576c",
+          subtle: "var(--border-subtle, #2a2e39)",
+          DEFAULT: "var(--border-default, #383e4d)",
+          strong: "var(--border-strong, #4f576c)",
         },
         accent: {
-          DEFAULT: "#f59e0b",
-          hover: "#d97706",
-          muted: "rgba(245, 158, 11, 0.15)",
+          DEFAULT: "var(--accent-default, #f59e0b)",
+          hover: "var(--accent-hover, #d97706)",
+          muted: "var(--accent-muted, rgba(245, 158, 11, 0.15))",
         },
       },
     },

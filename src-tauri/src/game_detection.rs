@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::Read;
 use sha2::{Digest, Sha256};
 use crate::models::{ConfidenceLevel, GameInstallation};
@@ -10,6 +10,7 @@ const SHA256_CLASSIC_10_US_HOODLUM: &str = "95503dd8a5cc8438db5d24d204a91eb81ff5
 const SIZE_CLASSIC_10_US_HOODLUM: u64 = 14_383_616;
 
 const SHA256_CLASSIC_10_US_RETAIL: &str = "170b6131c93a9c6870da3e33cfd9cd785c4943fcf4d42b03ca85a3a1f94d07d1";
+#[allow(dead_code)]
 const SIZE_CLASSIC_10_US_RETAIL: u64 = 14_383_616;
 
 const SIZE_CLASSIC_10_EU_RETAIL: u64 = 14_387_200;

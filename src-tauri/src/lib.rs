@@ -9,6 +9,7 @@ pub mod sources;
 pub mod downloads;
 pub mod game_launch;
 pub mod diagnostics;
+pub mod existing_mods;
 pub mod commands;
 #[cfg(test)]
 mod tests;
@@ -22,44 +23,40 @@ use sources::SourceManager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Clean any stale WebView2 locks from previous abrupt kills
-    if let Some(local_app_data) = dirs::data_local_dir() {
-        let lock_file = local_app_data
-            .join("org.samm.modmanager")
-            .join("EBWebView")
-            .join("lockfile");
-        if lock_file.exists() {
-            let _ = std::fs::remove_file(lock_file);
-        }
-    }
-
-    let _ = std::fs::OpenOptions::new().create(true).append(true).open("samm_startup.log").map(|mut f| {
-        use std::io::Write;
-        let _ = writeln!(f, "Purging locks and preparing SAMM dir");
-    });
-
     let app_data_dir = dirs::data_local_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))
         .join("SAMM");
 
     let _ = std::fs::create_dir_all(&app_data_dir);
     let db_path = app_data_dir.join("samm.db");
+    let log_file = app_data_dir.join("samm_startup.log");
 
-    let _ = std::fs::OpenOptions::new().create(true).append(true).open("samm_startup.log").map(|mut f| {
-        use std::io::Write;
-        let _ = writeln!(f, "Initializing SQLite DB at {:?}", db_path);
-    });
+    let log = |msg: &str| {
+        let _ = std::fs::OpenOptions::new().create(true).append(true).open(&log_file).map(|mut f| {
+            use std::io::Write;
+            let _ = writeln!(f, "{}", msg);
+        });
+    };
+
+    log(&format!("Initializing SQLite DB at {:?}", db_path));
 
     let db = match Database::init(&db_path) {
         Ok(d) => d,
-        Err(e) => {
-            let _ = std::fs::OpenOptions::new().create(true).append(true).open("samm_startup.log").map(|mut f| {
-                use std::io::Write;
-                let _ = writeln!(f, "Database init ERROR: {:?}", e);
-            });
-            panic!("DB init failed: {:?}", e);
+        Err(_) => {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            match Database::init(&db_path) {
+                Ok(d) => d,
+                Err(e) => {
+                    log(&format!("Database init retry failed: {:?}; opening recovered db", e));
+                    let backup_db_path = app_data_dir.join("samm_recovered.db");
+                    Database::init(&backup_db_path).unwrap_or_else(|_| Database::in_memory().expect("In-memory DB fallback"))
+                }
+            }
         }
     };
+
+    log("[CHECKPOINT 1] DB ready, creating app_state");
+
     let source_manager = SourceManager::new();
     let download_manager = DownloadManager::new(db.clone());
 
@@ -70,13 +67,65 @@ pub fn run() {
         app_data_dir,
     });
 
-    let res = tauri::Builder::default()
-        .setup(|app| {
+    log("[CHECKPOINT 2] Building tauri app");
+
+    let log_file_clone1 = log_file.clone();
+    let log_file_clone2 = log_file.clone();
+    let log_file_clone3 = log_file.clone();
+
+    let app = match tauri::Builder::default()
+        .setup(move |app| {
+            let _ = std::fs::OpenOptions::new().create(true).append(true).open(&log_file_clone1).map(|mut f| {
+                use std::io::Write;
+                let _ = writeln!(f, "[CHECKPOINT 3] Setup hook running");
+            });
+
             if let Some(window) = app.get_webview_window("main") {
-                if let Ok(icon) = tauri::image::Image::from_app_icon_resource(128) {
+                if let Ok(icon) = tauri::image::Image::from_bytes(include_bytes!("../icons/icon.png")) {
                     let _ = window.set_icon(icon);
-                } else if let Some(icon) = app.default_window_icon() {
-                    let _ = window.set_icon(icon.clone());
+                }
+
+                #[cfg(windows)]
+                {
+                    use std::ptr::null_mut;
+                    if let Ok(hwnd) = window.hwnd() {
+                        let hwnd_ptr = hwnd.0 as *mut std::ffi::c_void;
+                        #[link(name = "user32")]
+                        extern "system" {
+                            fn SendMessageW(hWnd: *mut std::ffi::c_void, Msg: u32, wParam: usize, lParam: isize) -> isize;
+                            fn LoadImageW(
+                                hInst: *mut std::ffi::c_void,
+                                name: *const u16,
+                                type_: u32,
+                                cx: i32,
+                                cy: i32,
+                                fuLoad: u32,
+                            ) -> *mut std::ffi::c_void;
+                            fn GetSystemMetrics(nIndex: i32) -> i32;
+                        }
+                        #[link(name = "kernel32")]
+                        extern "system" {
+                            fn GetModuleHandleW(lpModuleName: *const u16) -> *mut std::ffi::c_void;
+                        }
+
+                        unsafe {
+                            let h_module = GetModuleHandleW(null_mut());
+                            let sm_cx = GetSystemMetrics(49); // SM_CXSMICON
+                            let sm_cy = GetSystemMetrics(50); // SM_CYSMICON
+                            let lg_cx = GetSystemMetrics(11); // SM_CXICON
+                            let lg_cy = GetSystemMetrics(12); // SM_CYICON
+
+                            let h_icon_big = LoadImageW(h_module, 1 as *const u16, 1 /* IMAGE_ICON */, lg_cx, lg_cy, 0);
+                            let h_icon_small = LoadImageW(h_module, 1 as *const u16, 1 /* IMAGE_ICON */, sm_cx, sm_cy, 0);
+
+                            if !h_icon_big.is_null() {
+                                SendMessageW(hwnd_ptr, 0x0080 /* WM_SETICON */, 1 /* ICON_BIG */, h_icon_big as isize);
+                            }
+                            if !h_icon_small.is_null() {
+                                SendMessageW(hwnd_ptr, 0x0080 /* WM_SETICON */, 0 /* ICON_SMALL */, h_icon_small as isize);
+                            }
+                        }
+                    }
                 }
             }
             Ok(())
@@ -105,6 +154,8 @@ pub fn run() {
             commands::export_profile,
             commands::import_profile,
             commands::get_conflicts,
+            commands::resolve_conflict,
+            commands::auto_resolve_conflicts,
             commands::get_backups,
             commands::start_download,
             commands::get_download_jobs,
@@ -112,19 +163,40 @@ pub fn run() {
             commands::get_diagnostic_report,
             commands::get_settings,
             commands::save_settings,
+            commands::sync_existing_mods,
+            commands::pick_folder,
+            commands::pick_archive_file,
+            commands::open_path_in_explorer,
+            commands::open_url_in_browser,
+            commands::is_game_process_running,
+            commands::kill_game_process,
+            commands::batch_toggle_mods,
+            commands::batch_uninstall_mods,
+            commands::get_recent_downloaded_archives,
+            commands::clear_download_cache,
+            commands::purge_stale_backups,
         ])
-        .run(tauri::generate_context!());
+        .build(tauri::generate_context!()) {
+            Ok(a) => {
+                let _ = std::fs::OpenOptions::new().create(true).append(true).open(&log_file_clone2).map(|mut f| {
+                    use std::io::Write;
+                    let _ = writeln!(f, "[CHECKPOINT 4] App built OK, calling app.run()");
+                });
+                a
+            }
+            Err(e) => {
+                let _ = std::fs::OpenOptions::new().create(true).append(true).open(&log_file_clone2).map(|mut f| {
+                    use std::io::Write;
+                    let _ = writeln!(f, "Tauri build error: {:?}", e);
+                });
+                return;
+            }
+        };
 
-    if let Err(e) = res {
-        let _ = std::fs::OpenOptions::new().create(true).append(true).open("samm_startup.log").map(|mut f| {
+    app.run(move |_app_handle, event| {
+        let _ = std::fs::OpenOptions::new().create(true).append(true).open(&log_file_clone3).map(|mut f| {
             use std::io::Write;
-            let _ = writeln!(f, "Tauri Run Error: {:?}", e);
+            let _ = writeln!(f, "App RunEvent: {:?}", event);
         });
-        panic!("Tauri run error: {:?}", e);
-    } else {
-        let _ = std::fs::OpenOptions::new().create(true).append(true).open("samm_startup.log").map(|mut f| {
-            use std::io::Write;
-            let _ = writeln!(f, "Tauri exited cleanly.");
-        });
-    }
+    });
 }

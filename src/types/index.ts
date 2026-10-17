@@ -187,6 +187,12 @@ export interface FileConflict {
   resolutionNotes: string | null;
 }
 
+export interface ConflictResolutionResult {
+  resolvedCount: number;
+  actionsTaken: string[];
+  remainingConflicts: number;
+}
+
 export interface BackupRecord {
   id: string;
   gameInstallationId: string;
@@ -224,6 +230,11 @@ export interface DiagnosticReport {
   recentLogs: string[];
 }
 
+export interface CacheCleanupResult {
+  filesRemoved: number;
+  bytesFreed: number;
+}
+
 export interface AppSettings {
   defaultGameInstallationId: string | null;
   downloadDirectory: string;
@@ -231,8 +242,12 @@ export interface AppSettings {
   maxConcurrentDownloads: number;
   requireInstallConfirmation: boolean;
   autoCheckUpdates: boolean;
-  theme: 'dark' | 'light';
+  theme: 'charcoal' | 'midnight' | 'slate' | 'cyberpunk' | 'emerald';
   logLevel: 'debug' | 'info' | 'warn' | 'error';
+  defaultLaunchArgs?: string;
+  defaultAspectRatio?: string;
+  autoResolveConflicts?: boolean;
+  autoDetectGameOnStartup?: boolean;
 }
 
 export interface AutoInstallStatus {
@@ -240,4 +255,11 @@ export interface AutoInstallStatus {
   progress?: number;
   message?: string;
   error?: string;
+}
+
+export interface DownloadedArchiveItem {
+  fileName: string;
+  absolutePath: string;
+  fileSizeBytes: number;
+  modifiedTimestamp: number;
 }

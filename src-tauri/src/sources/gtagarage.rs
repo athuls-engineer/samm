@@ -4,6 +4,7 @@ use crate::models::{InstallationStrategyType, ModRecord, SourceCapabilities};
 use super::SourceAdapter;
 
 pub struct GtaGarageAdapter {
+    #[allow(dead_code)]
     client: Client,
 }
 
@@ -786,7 +787,13 @@ impl SourceAdapter for GtaGarageAdapter {
                     || m.author.to_lowercase().contains(&q)
                     || m.tags.iter().any(|t| t.to_lowercase().contains(&q));
 
-                let matches_cat = cat.as_ref().map_or(true, |c| m.category.to_lowercase() == *c);
+                let matches_cat = cat.as_ref().map_or(true, |c| {
+                    if c == "essential & popular" || c == "essential" || c == "popular" {
+                        m.tags.iter().any(|t| t.eq_ignore_ascii_case("essential") || t.eq_ignore_ascii_case("popular"))
+                    } else {
+                        m.category.to_lowercase() == *c
+                    }
+                });
 
                 matches_query && matches_cat
             })

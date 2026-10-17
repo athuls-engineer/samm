@@ -46,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'installed' as NavTab, label: 'Installed Mods', icon: Package, badge: installedCount > 0 ? installedCount : undefined },
     { id: 'downloads' as NavTab, label: 'Downloads', icon: DownloadCloud, badge: downloadCount > 0 ? downloadCount : undefined },
     { id: 'profiles' as NavTab, label: 'Profiles', icon: Layers },
-    { id: 'installations' as NavTab, label: 'Game Versions', icon: Gamepad2 },
+    { id: 'installations' as NavTab, label: 'Game Installations', icon: Gamepad2 },
     { id: 'conflicts' as NavTab, label: 'Conflicts', icon: AlertTriangle, badge: conflictCount > 0 ? conflictCount : undefined, badgeColor: 'bg-amber-600' },
     { id: 'backups' as NavTab, label: 'Backups & Restore', icon: History },
     { id: 'diagnostics' as NavTab, label: 'Diagnostics', icon: Activity },
@@ -102,13 +102,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </nav>
       </div>
 
-      {/* Safety Notice & Baseline Status */}
-      <div className="p-4 border-t border-border-subtle bg-bg-card/40 m-2 rounded text-[11px] text-neutral-400">
-        <div className="font-semibold text-neutral-300 mb-1 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          Engine Guard Active
+      {/* System Status Footer */}
+      <div className="p-3 border-t border-border-subtle bg-bg-card/30 m-2 rounded text-xs text-neutral-400 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span className="text-[11px] font-medium text-neutral-300">GTA: SA v1.0</span>
         </div>
-        <div>Transactions isolated with automatic recovery journal and backups.</div>
+        <span className="text-[10px] font-mono text-neutral-500">Ready</span>
       </div>
     </aside>
   );

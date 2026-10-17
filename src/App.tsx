@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   GameInstallation,
   InstalledMod,
@@ -12,6 +12,7 @@ import {
   AutoInstallStatus,
 } from './types';
 import { api } from './api/client';
+import { RotateCcw } from 'lucide-react';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { Header } from './components/Header';
 import { PlanPreviewModal } from './components/PlanPreviewModal';
@@ -59,11 +60,16 @@ export const App: React.FC = () => {
   const loadData = async () => {
     try {
       // 1. Run root queries concurrently in parallel
-      const [insts, srcs, dls] = await Promise.all([
+      const [insts, srcs, dls, appSettings] = await Promise.all([
         api.getInstallations(),
         api.listSources(),
         api.getDownloadJobs(),
+        api.getSettings().catch(() => null),
       ]);
+
+      if (appSettings?.theme) {
+        document.documentElement.className = 'theme-' + appSettings.theme;
+      }
 
       setInstallations(insts);
       setSources(srcs);
@@ -103,7 +109,7 @@ export const App: React.FC = () => {
     loadData();
   }, []);
 
-  // Poll active downloads every 2 seconds if any are downloading
+  // Poll active downloads every 2.5 seconds if any are downloading
   useEffect(() => {
     const hasActiveDownloads = downloadJobs.some((j) => j.status === 'downloading');
     if (!hasActiveDownloads) return;
@@ -111,14 +117,154 @@ export const App: React.FC = () => {
     const interval = setInterval(async () => {
       try {
         const dls = await api.getDownloadJobs();
-        setDownloadJobs(dls);
+        setDownloadJobs((prev) => {
+          const prevStr = JSON.stringify(prev);
+          const newStr = JSON.stringify(dls);
+          return prevStr === newStr ? prev : dls;
+        });
       } catch (e) {
         console.error(e);
       }
-    }, 2000);
+    }, 2500);
 
     return () => clearInterval(interval);
   }, [downloadJobs]);
+
+  const [isGameRunning, setIsGameRunning] = useState(false);
+
+  // Poll GTA San Andreas process status every 4s (only when window is visible)
+  useEffect(() => {
+    if (!activeGame?.id) {
+      setIsGameRunning(false);
+      return;
+    }
+
+    const gameId = activeGame.id;
+    let active = true;
+
+    const checkProcess = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      try {
+        const running = await api.isGameProcessRunning(gameId);
+        if (active) {
+          setIsGameRunning((prev) => (prev !== running ? running : prev));
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    checkProcess();
+    const interval = setInterval(checkProcess, 4000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [activeGame?.id]);
+
+  const handleKillGame = async () => {
+    if (!activeGame) return;
+    try {
+      await api.killGameProcess(activeGame.id);
+      setIsGameRunning(false);
+      showToast('GTA: San Andreas process terminated.');
+    } catch (e: any) {
+      showToast(`Failed to kill process: ${e?.message || e}`, 'error');
+    }
+  };
+
+  const handleOpenGameFolder = async () => {
+    if (!activeGame) return;
+    try {
+      await api.openPathInExplorer(activeGame.rootPath);
+    } catch (e: any) {
+      showToast(`Failed to open folder: ${e?.message || e}`, 'error');
+    }
+  };
+
+  const activeGameRef = useRef<GameInstallation | null>(null);
+  activeGameRef.current = activeGame;
+
+  const handleInspectArchiveDirectly = useCallback(async (archivePath: string) => {
+    const currentActiveGame = activeGameRef.current;
+    if (!currentActiveGame) {
+      showToast('Please select or locate your GTA: San Andreas installation folder first!', 'error');
+      setCurrentTab('installations');
+      return;
+    }
+
+    const modTitle = archivePath.split(/[\\/]/).pop()?.replace(/\.[^.]+$/, '') || 'Mod Archive';
+    const modSlug = modTitle.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+
+    try {
+      showToast(`Inspecting archive: ${archivePath.split(/[\\/]/).pop()}...`);
+      const plan = await api.generateInstallationPlan(
+        archivePath,
+        currentActiveGame.id,
+        `local_archive_${modSlug}_${Date.now()}`,
+        modTitle
+      );
+      setActivePlan(plan);
+      setActivePlanArchivePath(archivePath);
+    } catch (e: any) {
+      showToast(`Inspection failed: ${e?.message || e}`, 'error');
+    }
+  }, []);
+
+  // Tauri 2 Window Drag and Drop Archive listener (registered once on mount)
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let isSubscribed = true;
+
+    async function setupDragDrop() {
+      try {
+        const { getCurrentWebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+        const fn = await getCurrentWebviewWindow().onDragDropEvent((event) => {
+          if (event.payload.type === 'drop') {
+            const paths = event.payload.paths;
+            if (paths && paths.length > 0) {
+              const droppedPath = paths[0];
+              const lower = droppedPath.toLowerCase();
+              if (lower.endsWith('.zip') || lower.endsWith('.rar') || lower.endsWith('.7z') || lower.endsWith('.asi') || lower.endsWith('.cs') || lower.endsWith('.cleo')) {
+                handleInspectArchiveDirectly(droppedPath);
+              }
+            }
+          }
+        });
+        if (isSubscribed) {
+          unlisten = fn;
+        } else {
+          fn();
+        }
+      } catch (e) {
+        console.warn('Drag-and-drop listener setup:', e);
+      }
+    }
+
+    setupDragDrop();
+    return () => {
+      isSubscribed = false;
+      if (unlisten) unlisten();
+    };
+  }, [handleInspectArchiveDirectly]);
+
+  // Global F5 and Escape listeners
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F5') {
+        e.preventDefault();
+        loadData();
+        showToast('Application data refreshed.');
+      } else if (e.key === 'Escape') {
+        setSelectedModForDetails(null);
+        setInspectingManifestMod(null);
+        setShowArchiveImportModal(false);
+        setActivePlan(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleSelectActiveGame = async (id: string) => {
     try {
@@ -134,9 +280,26 @@ export const App: React.FC = () => {
     if (!activeGame) return;
     try {
       const pid = await api.launchGame(activeGame.id, customArgs);
+      setIsGameRunning(true);
       showToast(`GTA: San Andreas launched successfully (PID: ${pid})`);
     } catch (e: any) {
       showToast(`Launch failed: ${e?.toString()}`, 'error');
+    }
+  };
+
+  const handleRestartGame = async (customArgs: string[] = ['-novid']) => {
+    if (!activeGame) return;
+    try {
+      showToast('Restarting GTA: San Andreas to apply mod changes...');
+      await api.killGameProcess(activeGame.id);
+      setIsGameRunning(false);
+      // Brief pause to allow OS file handles and memory to release cleanly
+      await new Promise((r) => setTimeout(r, 600));
+      const pid = await api.launchGame(activeGame.id, customArgs);
+      setIsGameRunning(true);
+      showToast(`GTA: San Andreas restarted successfully (PID: ${pid})`);
+    } catch (e: any) {
+      showToast(`Restart failed: ${e?.message || e}`, 'error');
     }
   };
 
@@ -145,7 +308,14 @@ export const App: React.FC = () => {
     try {
       await api.toggleModState(modId, enabled, activeGame.id);
       await loadData();
-      showToast(`Mod state updated: ${enabled ? 'Enabled' : 'Disabled'}`);
+      if (isGameRunning) {
+        showToast(
+          `Mod ${enabled ? 'enabled' : 'disabled'} on disk. Restart game to apply changes.`,
+          'success'
+        );
+      } else {
+        showToast(`Mod ${enabled ? 'Enabled' : 'Disabled'}`);
+      }
     } catch (e: any) {
       showToast(e?.toString() || 'Failed to toggle mod', 'error');
     }
@@ -156,7 +326,14 @@ export const App: React.FC = () => {
     try {
       await api.uninstallMod(modId, activeGame.id);
       await loadData();
-      showToast('Mod uninstalled and original backed-up files restored successfully.');
+      if (isGameRunning) {
+        showToast(
+          'Mod uninstalled. Restart game to remove active files from memory.',
+          'success'
+        );
+      } else {
+        showToast('Mod uninstalled and original files restored successfully.');
+      }
     } catch (e: any) {
       showToast(e?.toString() || 'Uninstall failed', 'error');
     }
@@ -281,7 +458,7 @@ export const App: React.FC = () => {
         [mod.id]: { step: 'completed', progress: 100, message: 'Installed successfully!' },
       }));
 
-      showToast(`⚡ '${mod.title}' automatically installed into GTA: San Andreas!`, 'success');
+      showToast(`Installed '${mod.title}' successfully.`, 'success');
       await loadData();
     } catch (e: any) {
       const msg = typeof e === 'string' ? e : e?.message || 'Auto-install failed';
@@ -331,6 +508,20 @@ export const App: React.FC = () => {
       setActivePlanArchivePath(job.tempFilePath);
     } catch (e: any) {
       showToast(e?.toString() || 'Failed to generate plan for downloaded file', 'error');
+    }
+  };
+
+  const handleRescanExistingMods = async () => {
+    if (!activeGame) {
+      showToast('No active game selected to scan.', 'error');
+      return;
+    }
+    try {
+      const synced = await api.syncExistingMods(activeGame.id);
+      await loadData();
+      showToast(`Detected and synchronized ${synced.length} mods from game directory!`);
+    } catch (e: any) {
+      showToast(e?.toString() || 'Failed to scan existing mods', 'error');
     }
   };
 
@@ -388,10 +579,46 @@ export const App: React.FC = () => {
         <Header
           activeGame={activeGame}
           activeProfile={activeProfile}
+          isGameRunning={isGameRunning}
           onLaunchGame={() => handleLaunchGame(['-novid'])}
+          onKillGame={handleKillGame}
+          onRestartGame={() => handleRestartGame(['-novid'])}
+          onOpenGameFolder={handleOpenGameFolder}
           onImportArchive={() => setShowArchiveImportModal(true)}
           onSelectGameClick={() => setCurrentTab('installations')}
         />
+
+        {/* Global Game Running Notice Banner */}
+        {isGameRunning && (
+          <div className="bg-amber-950/70 border-b border-amber-800/80 px-4 md:px-6 py-2 flex items-center justify-between text-xs text-amber-200 flex-wrap gap-2 animate-in fade-in select-none">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400"></span>
+              </span>
+              <span>
+                <strong>GTA: San Andreas is currently running.</strong> Changes to installed mods will take effect after restarting the game.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => handleRestartGame()}
+                className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs flex items-center gap-1 shadow-sm transition-colors cursor-pointer"
+                title="Restart game now to reload all modified files into memory"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Restart Game</span>
+              </button>
+              <button
+                onClick={handleKillGame}
+                className="px-2.5 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs border border-neutral-700 transition-colors cursor-pointer"
+                title="Terminate game process"
+              >
+                <span>Exit Game</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         <main className="flex-1 overflow-y-auto">
           {currentTab === 'home' && (
@@ -401,8 +628,11 @@ export const App: React.FC = () => {
               installedMods={installedMods}
               conflictsCount={conflicts.length}
               backupsCount={backups.length}
+              isGameRunning={isGameRunning}
               onNavigate={setCurrentTab}
               onLaunchGame={handleLaunchGame}
+              onKillGame={handleKillGame}
+              onToast={showToast}
             />
           )}
 
@@ -420,9 +650,12 @@ export const App: React.FC = () => {
           {currentTab === 'installed' && (
             <InstalledMods
               mods={installedMods}
+              activeGame={activeGame}
               onToggleState={handleToggleMod}
               onUninstall={handleUninstallMod}
               onInspectFiles={setInspectingManifestMod}
+              onRescanFolder={handleRescanExistingMods}
+              onToast={showToast}
             />
           )}
 
@@ -478,11 +711,17 @@ export const App: React.FC = () => {
               installations={installations}
               onSelectActive={handleSelectActiveGame}
               onRefresh={loadData}
+              onNavigateToInstalled={() => setCurrentTab('installed')}
             />
           )}
 
           {currentTab === 'conflicts' && (
-            <Conflicts conflicts={conflicts} onRefresh={loadData} />
+            <Conflicts
+              conflicts={conflicts}
+              activeGame={activeGame}
+              onRefresh={loadData}
+              onToast={showToast}
+            />
           )}
 
           {currentTab === 'backups' && (
@@ -524,7 +763,7 @@ export const App: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1 text-emerald-400 font-medium text-[10px]">
-              <span>🛡️ Safe Journal Active</span>
+              <span>Auto-Backup & Rollback Ready</span>
             </div>
           </div>
         </footer>

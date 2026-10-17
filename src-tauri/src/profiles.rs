@@ -1,4 +1,4 @@
-use crate::models::{InstalledMod, Profile};
+use crate::models::Profile;
 use crate::database::Database;
 use serde::{Deserialize, Serialize};
 

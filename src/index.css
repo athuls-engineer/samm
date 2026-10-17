@@ -2,6 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
+:root,
+.theme-charcoal {
+  --bg-main: #0f1115;
+  --bg-subtle: #16181d;
+  --bg-card: #1c1f26;
+  --bg-hover: #252932;
+  --bg-active: #2e333e;
+  --border-subtle: #2a2e39;
+  --border-default: #383e4d;
+  --border-strong: #4f576c;
+  --accent-default: #f59e0b;
+  --accent-hover: #d97706;
+  --accent-muted: rgba(245, 158, 11, 0.15);
+}
+
+.theme-midnight {
+  --bg-main: #000000;
+  --bg-subtle: #08080a;
+  --bg-card: #101014;
+  --bg-hover: #18181f;
+  --bg-active: #22222a;
+  --border-subtle: #1e1e24;
+  --border-default: #2c2c36;
+  --border-strong: #444452;
+  --accent-default: #fbbf24;
+  --accent-hover: #f59e0b;
+  --accent-muted: rgba(251, 191, 36, 0.15);
+}
+
+.theme-slate {
+  --bg-main: #0b0f19;
+  --bg-subtle: #111827;
+  --bg-card: #1e293b;
+  --bg-hover: #334155;
+  --bg-active: #475569;
+  --border-subtle: #1e293b;
+  --border-default: #334155;
+  --border-strong: #64748b;
+  --accent-default: #38bdf8;
+  --accent-hover: #0284c7;
+  --accent-muted: rgba(56, 189, 248, 0.15);
+}
+
+.theme-cyberpunk {
+  --bg-main: #0c0a09;
+  --bg-subtle: #1c1917;
+  --bg-card: #292524;
+  --bg-hover: #44403c;
+  --bg-active: #57534e;
+  --border-subtle: #292524;
+  --border-default: #44403c;
+  --border-strong: #78716c;
+  --accent-default: #eab308;
+  --accent-hover: #ca8a04;
+  --accent-muted: rgba(234, 179, 8, 0.15);
+}
+
+.theme-emerald {
+  --bg-main: #04120c;
+  --bg-subtle: #071e13;
+  --bg-card: #0d2c1d;
+  --bg-hover: #15422d;
+  --bg-active: #1d593d;
+  --border-subtle: #113624;
+  --border-default: #1c4d34;
+  --border-strong: #2a734e;
+  --accent-default: #10b981;
+  --accent-hover: #059669;
+  --accent-muted: rgba(16, 185, 129, 0.15);
+}
+
 @layer base {
   body {
     @apply bg-bg-main text-neutral-200 antialiased font-sans;
@@ -15,13 +86,14 @@
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #12141a;
+    background: var(--bg-subtle, #12141a);
   }
   ::-webkit-scrollbar-thumb {
-    background: #2b303c;
+    background: var(--border-default, #2b303c);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3b4252;
+    background: var(--border-strong, #3b4252);
   }
 }
+

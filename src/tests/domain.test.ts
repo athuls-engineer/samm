@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { ConfidenceLevel, InstallationPlan, ModRecord, InstalledMod } from '../types';
+import type { ConfidenceLevel, InstallationPlan, ModRecord, InstalledMod } from '../types/index.ts';
 
 test('confidence level rating verification', () => {
   const verifiedConfidence: ConfidenceLevel = 'confirmed';

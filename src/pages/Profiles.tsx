@@ -53,9 +53,9 @@ export const Profiles: React.FC<ProfilesProps> = ({
     <div className="p-8 space-y-6 max-w-6xl mx-auto">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-lg font-bold text-white">Mod Profiles & Sandboxes</h1>
+          <h1 className="text-lg font-bold text-white">Mod Profiles</h1>
           <p className="text-xs text-neutral-400">
-            Maintain isolated mod configurations for the same game installation (e.g. Vanilla Baseline, Enhancements, Total Conversion).
+            Maintain independent mod configurations for the same game installation (e.g. Vanilla Baseline, Visual Enhancements, Total Conversion).
           </p>
         </div>
 
@@ -115,7 +115,7 @@ export const Profiles: React.FC<ProfilesProps> = ({
               </div>
 
               <p className="text-xs text-neutral-300 leading-relaxed">
-                {profile.description || 'Custom mod configuration sandbox.'}
+                {profile.description || 'Custom mod configuration profile.'}
               </p>
 
               <div className="text-[11px] text-neutral-400 font-mono">
@@ -170,7 +170,7 @@ export const Profiles: React.FC<ProfilesProps> = ({
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="e.g. Visual Overhaul, Testing Sandbox"
+                  placeholder="e.g. Visual Overhaul, Speedrun Setup"
                   className="w-full bg-bg-main border border-border rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-accent"
                 />
               </div>

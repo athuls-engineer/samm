@@ -1,5 +1,5 @@
 use rusqlite::{params, Connection, Result};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use crate::models::*;
 
@@ -577,6 +577,7 @@ impl Database {
         conn.execute("DELETE FROM installed_files WHERE installed_mod_id = ?1", params![id])?;
         conn.execute("DELETE FROM installed_mods WHERE id = ?1", params![id])?;
         conn.execute("DELETE FROM profile_mods WHERE mod_id = ?1", params![id])?;
+        conn.execute("DELETE FROM conflicts WHERE active_mod_id = ?1 OR conflicting_mod_id = ?1", params![id])?;
         Ok(())
     }
 
@@ -755,6 +756,75 @@ impl Database {
         Ok(list)
     }
 
+    pub fn resolve_file_conflict(
+        &self,
+        destination_rel_path: &str,
+        _keep_mod_id: &str,
+        yield_mod_id: &str,
+    ) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+
+        // 1. Remove the file claim from the yielding mod
+        conn.execute(
+            "DELETE FROM installed_files 
+             WHERE installed_mod_id = ?1 AND LOWER(destination_rel_path) = LOWER(?2)",
+            params![yield_mod_id, destination_rel_path],
+        )?;
+
+        // 2. Clear from conflicts table if tracked there
+        conn.execute(
+            "DELETE FROM conflicts WHERE LOWER(destination_rel_path) = LOWER(?1)",
+            params![destination_rel_path],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn auto_resolve_all_conflicts(&self, game_id: &str) -> Result<usize> {
+        let installed_mods = self.get_installed_mods(game_id)?;
+        let conflicts = crate::conflicts::scan_existing_installed_conflicts(&installed_mods);
+        let count = conflicts.len();
+
+        let conn = self.conn.lock().unwrap();
+
+        for c in &conflicts {
+            let lower = c.destination_rel_path.to_lowercase();
+            // Intelligent heuristic: keep foundational / standalone tool and yield from bundled consumer
+            let yield_id = if lower == "vorbisfile.dll" || lower == "vorbishooked.dll" {
+                if c.active_mod_id == "local_asi_loader" || c.active_mod_name.to_lowercase().contains("loader") {
+                    &c.conflicting_mod_id
+                } else if c.conflicting_mod_id == "local_asi_loader" || c.conflicting_mod_name.to_lowercase().contains("loader") {
+                    &c.active_mod_id
+                } else {
+                    &c.conflicting_mod_id
+                }
+            } else if lower.contains("limitadjuster") {
+                if c.active_mod_id.contains("limit_adjuster") || c.active_mod_name.to_lowercase().contains("limit adjuster") {
+                    &c.conflicting_mod_id
+                } else if c.conflicting_mod_id.contains("limit_adjuster") || c.conflicting_mod_name.to_lowercase().contains("limit adjuster") {
+                    &c.active_mod_id
+                } else {
+                    &c.conflicting_mod_id
+                }
+            } else {
+                &c.conflicting_mod_id
+            };
+
+            conn.execute(
+                "DELETE FROM installed_files 
+                 WHERE installed_mod_id = ?1 AND LOWER(destination_rel_path) = LOWER(?2)",
+                params![yield_id, c.destination_rel_path],
+            )?;
+
+            conn.execute(
+                "DELETE FROM conflicts WHERE LOWER(destination_rel_path) = LOWER(?1)",
+                params![c.destination_rel_path],
+            )?;
+        }
+
+        Ok(count)
+    }
+
     // --- App Settings ---
     pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
         let conn = self.conn.lock().unwrap();
@@ -870,22 +940,27 @@ impl Database {
              WHERE (title LIKE ?1 OR description LIKE ?1 OR author LIKE ?1)"
         );
 
+        let mut param_values: Vec<Box<dyn rusqlite::ToSql>> = vec![Box::new(query_pattern)];
+
         if let Some(cat) = category {
             if !cat.is_empty() && cat != "All" {
-                sql.push_str(&format!(" AND category = '{}'", cat.replace('\'', "''")));
+                param_values.push(Box::new(cat.to_string()));
+                sql.push_str(&format!(" AND category = ?{}", param_values.len()));
             }
         }
 
         if let Some(src) = source {
-            if !src.is_empty() && src != "All" {
-                sql.push_str(&format!(" AND source_id = '{}'", src.replace('\'', "''")));
+            if !src.is_empty() && src != "All" && src != "all" {
+                param_values.push(Box::new(src.to_string()));
+                sql.push_str(&format!(" AND source_id = ?{}", param_values.len()));
             }
         }
 
         sql.push_str(" ORDER BY update_date DESC, title ASC LIMIT 100");
 
         let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt.query_map(params![query_pattern], |row| {
+        let param_refs: Vec<&dyn rusqlite::ToSql> = param_values.iter().map(|p| p.as_ref()).collect();
+        let rows = stmt.query_map(param_refs.as_slice(), |row| {
             let tags_json: String = row.get(7)?;
             let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
             let gv_json: String = row.get(15)?;
@@ -949,6 +1024,8 @@ impl Database {
                 expected_sha256, computed_sha256, sha256_matched, start_time, completed_time
             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
             ON CONFLICT(id) DO UPDATE SET
+                temp_file_path = excluded.temp_file_path,
+                total_bytes = excluded.total_bytes,
                 downloaded_bytes = excluded.downloaded_bytes,
                 speed_bytes_per_sec = excluded.speed_bytes_per_sec,
                 status = excluded.status,

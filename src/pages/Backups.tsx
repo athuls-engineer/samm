@@ -11,9 +11,9 @@ export const Backups: React.FC<BackupsProps> = ({ backups, onRefresh }) => {
   return (
     <div className="p-8 space-y-6 max-w-6xl mx-auto">
       <div>
-        <h1 className="text-lg font-bold text-white">File Backups & Recovery Journal</h1>
+        <h1 className="text-lg font-bold text-white">File Backups & History</h1>
         <p className="text-xs text-neutral-400">
-          Complete cryptographic recovery archive. Every original file replaced by a mod is backed up outside the game directory before changes are applied.
+          Original game files replaced by mods are stored safely and can be restored at any time.
         </p>
       </div>
 
