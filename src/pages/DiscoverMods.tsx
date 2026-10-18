@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Star,
   Flame,
+  X,
 } from 'lucide-react';
 
 interface DiscoverModsProps {
@@ -27,6 +28,7 @@ interface DiscoverModsProps {
   onSelectMod: (mod: ModRecord) => void;
   onOneClickInstall: (mod: ModRecord) => void;
   onImportArchive: () => void;
+  onCancelOneClickInstall?: (modId: string) => void;
 }
 
 // Global module-level cache for instant tab transitions
@@ -39,6 +41,7 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
   onSelectMod,
   onOneClickInstall,
   onImportArchive,
+  onCancelOneClickInstall,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedSource, setSelectedSource] = useState<string>('all');
@@ -399,34 +402,55 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
 
                   {/* Primary Trigger Button */}
                   {mod.downloadUrl ? (
-                    <button
-                      onClick={() => onOneClickInstall(mod)}
-                      disabled={isBusy}
-                      className={`h-8 px-3.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all shadow cursor-pointer ${
-                        isBusy
-                          ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
-                          : isInstalled
-                          ? 'bg-neutral-800 hover:bg-neutral-700 text-amber-300 border border-neutral-700'
-                          : 'bg-accent hover:bg-accent-hover text-bg-main active:scale-[0.98]'
-                      }`}
-                    >
-                      {isBusy ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Installing...</span>
-                        </>
-                      ) : isInstalled ? (
-                        <>
-                          <RotateCcw className="w-3.5 h-3.5" />
-                          <span>Reinstall</span>
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-3.5 h-3.5 fill-current" />
-                          <span>1-Click Install</span>
-                        </>
-                      )}
-                    </button>
+                    isBusy ? (
+                      <div className="flex items-center gap-1.5">
+                        <div
+                          className="h-8 px-2.5 rounded text-xs font-bold flex items-center gap-1.5 bg-neutral-900 text-amber-300 border border-amber-900/60"
+                          title={autoStatus?.message || 'Processing mod...'}
+                        >
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                          <span>
+                            {autoStatus?.step === 'downloading'
+                              ? `Downloading ${autoStatus.progress ? autoStatus.progress + '%' : ''}`
+                              : autoStatus?.step === 'planning'
+                              ? 'Planning...'
+                              : 'Deploying...'}
+                          </span>
+                        </div>
+
+                        {onCancelOneClickInstall && (
+                          <button
+                            onClick={() => onCancelOneClickInstall(mod.id)}
+                            className="h-8 px-2.5 rounded bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-300 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                            title="Cancel loading and downloading this mod"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            <span>Cancel</span>
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => onOneClickInstall(mod)}
+                        className={`h-8 px-3.5 rounded text-xs font-bold flex items-center gap-1.5 transition-all shadow cursor-pointer ${
+                          isInstalled
+                            ? 'bg-neutral-800 hover:bg-neutral-700 text-amber-300 border border-neutral-700'
+                            : 'bg-accent hover:bg-accent-hover text-bg-main active:scale-[0.98]'
+                        }`}
+                      >
+                        {isInstalled ? (
+                          <>
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Reinstall</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-3.5 h-3.5 fill-current" />
+                            <span>1-Click Install</span>
+                          </>
+                        )}
+                      </button>
+                    )
                   ) : (
                     <a
                       href={mod.pageUrl}

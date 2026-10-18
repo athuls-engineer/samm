@@ -184,6 +184,18 @@ export const api = {
     return await invoke('get_download_jobs');
   },
 
+  cancelDownload: async (jobId: string): Promise<void> => {
+    return await invoke('cancel_download', { jobId });
+  },
+
+  deleteDownload: async (jobId: string): Promise<void> => {
+    return await invoke('delete_download', { jobId });
+  },
+
+  clearCompletedDownloads: async (): Promise<void> => {
+    return await invoke('clear_completed_downloads');
+  },
+
   // Launch & Diagnostics
   launchGame: async (gameId: string, customArgs: string[]): Promise<number> => {
     return await invoke('launch_game', { gameId, customArgs });

@@ -52,6 +52,9 @@ export const App: React.FC = () => {
   const [isInstalling, setIsInstalling] = useState(false);
   const [globalMessage, setGlobalMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+  const cancelledModIdsRef = useRef<Set<string>>(new Set());
+  const activeOneClickJobIdsRef = useRef<Map<string, string>>(new Map());
+
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setGlobalMessage({ text, type });
     setTimeout(() => setGlobalMessage(null), 4000);
@@ -373,6 +376,8 @@ export const App: React.FC = () => {
       return;
     }
 
+    cancelledModIdsRef.current.delete(mod.id);
+
     // Step 1: Initialize status
     setAutoInstallStates((prev) => ({
       ...prev,
@@ -388,6 +393,7 @@ export const App: React.FC = () => {
         mod.downloadUrl
       );
 
+      activeOneClickJobIdsRef.current.set(mod.id, job.id);
       setDownloadJobs((prev) => [job, ...prev]);
 
       // Poll until download finishes
@@ -395,7 +401,16 @@ export const App: React.FC = () => {
       let completedJob: DownloadJob | null = null;
 
       while (Date.now() - startTime < 180000) {
+        if (cancelledModIdsRef.current.has(mod.id)) {
+          throw new Error('Cancelled by user');
+        }
+
         await new Promise((r) => setTimeout(r, 600));
+
+        if (cancelledModIdsRef.current.has(mod.id)) {
+          throw new Error('Cancelled by user');
+        }
+
         const jobs = await api.getDownloadJobs();
         setDownloadJobs(jobs);
         const current = jobs.find((j) => j.id === job.id);
@@ -424,6 +439,10 @@ export const App: React.FC = () => {
         throw new Error('Download timed out');
       }
 
+      if (cancelledModIdsRef.current.has(mod.id)) {
+        throw new Error('Cancelled by user');
+      }
+
       // Step 2: Planning & Conflict Analysis & Backup
       setAutoInstallStates((prev) => ({
         ...prev,
@@ -436,6 +455,10 @@ export const App: React.FC = () => {
         mod.id,
         mod.title
       );
+
+      if (cancelledModIdsRef.current.has(mod.id)) {
+        throw new Error('Cancelled by user');
+      }
 
       // Step 3: Transactional Deployment into GTA SA
       setAutoInstallStates((prev) => ({
@@ -451,6 +474,8 @@ export const App: React.FC = () => {
         profileId
       );
 
+      activeOneClickJobIdsRef.current.delete(mod.id);
+
       // Step 4: Completed
       setAutoInstallStates((prev) => ({
         ...prev,
@@ -461,11 +486,96 @@ export const App: React.FC = () => {
       await loadData();
     } catch (e: any) {
       const msg = typeof e === 'string' ? e : e?.message || 'Auto-install failed';
+      activeOneClickJobIdsRef.current.delete(mod.id);
+
+      if (cancelledModIdsRef.current.has(mod.id) || msg.includes('Cancelled by user')) {
+        cancelledModIdsRef.current.delete(mod.id);
+        setAutoInstallStates((prev) => {
+          const next = { ...prev };
+          delete next[mod.id];
+          return next;
+        });
+        return;
+      }
+
       setAutoInstallStates((prev) => ({
         ...prev,
         [mod.id]: { step: 'failed', error: msg },
       }));
       showToast(`Install error: ${msg}`, 'error');
+    }
+  };
+
+  const handleCancelOneClickInstall = async (modId: string) => {
+    cancelledModIdsRef.current.add(modId);
+    setAutoInstallStates((prev) => {
+      const next = { ...prev };
+      delete next[modId];
+      return next;
+    });
+
+    const jobId = activeOneClickJobIdsRef.current.get(modId);
+    if (jobId) {
+      try {
+        await api.cancelDownload(jobId);
+        const updated = await api.getDownloadJobs();
+        setDownloadJobs(updated);
+      } catch (err) {
+        console.error('Failed to cancel download:', err);
+      }
+      activeOneClickJobIdsRef.current.delete(modId);
+    }
+    showToast('Cancelled mod loading and download.', 'success');
+  };
+
+  const handleCancelDownload = async (jobId: string) => {
+    try {
+      await api.cancelDownload(jobId);
+      const jobs = await api.getDownloadJobs();
+      setDownloadJobs(jobs);
+      showToast('Download cancelled successfully.', 'success');
+    } catch (e: any) {
+      showToast(typeof e === 'string' ? e : e?.message || 'Failed to cancel download', 'error');
+    }
+  };
+
+  const handleDeleteDownload = async (jobId: string) => {
+    try {
+      await api.deleteDownload(jobId);
+      const jobs = await api.getDownloadJobs();
+      setDownloadJobs(jobs);
+      showToast('Removed from download history.', 'success');
+    } catch (e: any) {
+      showToast(typeof e === 'string' ? e : e?.message || 'Failed to delete download', 'error');
+    }
+  };
+
+  const handleClearCompletedDownloads = async () => {
+    try {
+      await api.clearCompletedDownloads();
+      const jobs = await api.getDownloadJobs();
+      setDownloadJobs(jobs);
+      showToast('Cleared finished and failed downloads.', 'success');
+    } catch (e: any) {
+      showToast(typeof e === 'string' ? e : e?.message || 'Failed to clear downloads', 'error');
+    }
+  };
+
+  const handleRetryDownload = async (job: DownloadJob) => {
+    try {
+      await api.deleteDownload(job.id);
+      const newJob = await api.startDownload(
+        job.modId,
+        job.modTitle,
+        job.sourceId,
+        job.sourceName,
+        job.url,
+        job.expectedSha256 || undefined
+      );
+      setDownloadJobs((prev) => [newJob, ...prev.filter((j) => j.id !== job.id)]);
+      showToast(`Retrying download for '${job.modTitle}'...`, 'success');
+    } catch (e: any) {
+      showToast(typeof e === 'string' ? e : e?.message || 'Failed to retry download', 'error');
     }
   };
 
@@ -642,6 +752,7 @@ export const App: React.FC = () => {
               autoInstallStates={autoInstallStates}
               onSelectMod={setSelectedModForDetails}
               onOneClickInstall={handleOneClickInstall}
+              onCancelOneClickInstall={handleCancelOneClickInstall}
               onImportArchive={() => setShowArchiveImportModal(true)}
             />
           )}
@@ -663,6 +774,10 @@ export const App: React.FC = () => {
               jobs={downloadJobs}
               onInstallDownloaded={handleInstallDownloadedJob}
               onRefresh={loadData}
+              onCancelDownload={handleCancelDownload}
+              onDeleteDownload={handleDeleteDownload}
+              onClearCompleted={handleClearCompletedDownloads}
+              onRetryDownload={handleRetryDownload}
             />
           )}
 

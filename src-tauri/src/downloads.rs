@@ -25,8 +25,11 @@ impl Clone for DownloadManager {
 
 impl DownloadManager {
     pub fn new(db: Database) -> Self {
+        // Automatically mark any downloads left as 'downloading' from previous runs as failed/interrupted
+        let _ = db.cleanup_orphaned_downloads();
+
         let client = Client::builder()
-            .user_agent("SAMM-OpenSource-ModManager/0.1 (+https://github.com/samm-modmanager/samm)")
+            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .unwrap_or_default();
@@ -36,6 +39,38 @@ impl DownloadManager {
             db,
             active_downloads: Arc::new(Mutex::new(Vec::new())),
         }
+    }
+
+    pub fn cancel_download(&self, job_id: &str) -> Result<(), String> {
+        {
+            let mut list = self.active_downloads.lock().unwrap();
+            list.retain(|id| id != job_id);
+        }
+        if let Ok(mut jobs) = self.db.get_download_jobs() {
+            if let Some(j) = jobs.iter_mut().find(|j| j.id == job_id) {
+                j.status = "failed".to_string();
+                j.error_message = Some("Download cancelled by user".to_string());
+                j.speed_bytes_per_sec = 0;
+                let _ = self.db.save_download_job(j);
+
+                let p = PathBuf::from(&j.temp_file_path);
+                if p.exists() {
+                    let _ = fs::remove_file(&p);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn delete_download(&self, job_id: &str) -> Result<(), String> {
+        let _ = self.cancel_download(job_id);
+        self.db.delete_download_job(job_id).map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    pub fn clear_finished(&self) -> Result<(), String> {
+        self.db.clear_completed_downloads().map_err(|e| e.to_string())?;
+        Ok(())
     }
 
     pub fn start_download(
@@ -102,8 +137,25 @@ impl DownloadManager {
         let max_retries = 3;
 
         while retry_count < max_retries {
+            // Check if cancelled before executing or retrying
+            {
+                let list = self.active_downloads.lock().unwrap();
+                if !list.contains(&job_id) {
+                    return;
+                }
+            }
+
             match self.execute_chunked_download(&job_id, &url, &target_path).await {
                 Ok(_) => {
+                    // Check if cancelled right as download finished
+                    {
+                        let list = self.active_downloads.lock().unwrap();
+                        if !list.contains(&job_id) {
+                            let _ = fs::remove_file(&target_path);
+                            return;
+                        }
+                    }
+
                     // Small delay to ensure Windows OS file handles are completely released
                     tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
@@ -155,12 +207,19 @@ impl DownloadManager {
                     return;
                 }
                 Err(e) => {
+                    if e.contains("cancelled") {
+                        let mut list = self.active_downloads.lock().unwrap();
+                        list.retain(|id| id != &job_id);
+                        return;
+                    }
+
                     retry_count += 1;
                     if retry_count >= max_retries {
                         if let Ok(mut jobs) = self.db.get_download_jobs() {
                             if let Some(j) = jobs.iter_mut().find(|j| j.id == job_id) {
                                 j.status = "failed".to_string();
                                 j.error_message = Some(e);
+                                j.speed_bytes_per_sec = 0;
                                 let _ = self.db.save_download_job(j);
                             }
                         }
@@ -180,6 +239,14 @@ impl DownloadManager {
         url: &str,
         path: &Path,
     ) -> Result<(), String> {
+        // Quick cancellation check
+        {
+            let list = self.active_downloads.lock().unwrap();
+            if !list.contains(&job_id.to_string()) {
+                return Err("Download cancelled by user".to_string());
+            }
+        }
+
         // If file already exists, determine resumed offset
         let existing_len = if path.exists() {
             fs::metadata(path).map(|m| m.len()).unwrap_or(0)
@@ -213,6 +280,16 @@ impl DownloadManager {
         let mut bytes_since_last_update = 0u64;
 
         while let Some(chunk_result) = stream.next().await {
+            // Check if cancelled during active stream
+            {
+                let list = self.active_downloads.lock().unwrap();
+                if !list.contains(&job_id.to_string()) {
+                    drop(file);
+                    let _ = fs::remove_file(path);
+                    return Err("Download cancelled by user".to_string());
+                }
+            }
+
             let chunk = chunk_result.map_err(|e| format!("Stream error: {}", e))?;
             file.write_all(&chunk).map_err(|e| format!("Disk write error: {}", e))?;
 
@@ -240,3 +317,4 @@ impl DownloadManager {
         Ok(())
     }
 }
+

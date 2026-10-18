@@ -8,22 +8,33 @@ import {
   FolderOpen,
   Play,
   ShieldCheck,
+  XCircle,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 
 interface DownloadsProps {
   jobs: DownloadJob[];
   onInstallDownloaded: (job: DownloadJob) => void;
   onRefresh: () => void;
+  onCancelDownload: (jobId: string) => void;
+  onDeleteDownload: (jobId: string) => void;
+  onClearCompleted: () => void;
+  onRetryDownload?: (job: DownloadJob) => void;
 }
 
 export const Downloads: React.FC<DownloadsProps> = ({
   jobs,
   onInstallDownloaded,
   onRefresh,
+  onCancelDownload,
+  onDeleteDownload,
+  onClearCompleted,
+  onRetryDownload,
 }) => {
   return (
     <div className="p-8 space-y-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-lg font-bold text-white">Download Manager</h1>
           <p className="text-xs text-neutral-400">
@@ -31,13 +42,26 @@ export const Downloads: React.FC<DownloadsProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={onRefresh}
-          className="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-xs text-neutral-300 font-medium flex items-center gap-1.5 transition-colors"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          <span>Refresh</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {jobs.some((j) => j.status === 'completed' || j.status === 'failed') && (
+            <button
+              onClick={onClearCompleted}
+              className="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-xs text-neutral-300 font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Remove finished and failed downloads from history"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-neutral-400" />
+              <span>Clear Finished</span>
+            </button>
+          )}
+
+          <button
+            onClick={onRefresh}
+            className="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-xs text-neutral-300 font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Refresh</span>
+          </button>
+        </div>
       </div>
 
       {jobs.length === 0 ? (
@@ -112,7 +136,7 @@ export const Downloads: React.FC<DownloadsProps> = ({
                 )}
 
                 {/* Verification & Actions */}
-                <div className="pt-2 border-t border-border-subtle flex items-center justify-between text-xs">
+                <div className="pt-2 border-t border-border-subtle flex items-center justify-between gap-3 text-xs flex-wrap">
                   <div className="text-[11px] font-mono text-neutral-400 flex items-center gap-2">
                     {job.computedSha256 && (
                       <span className="flex items-center gap-1 text-emerald-400">
@@ -121,18 +145,63 @@ export const Downloads: React.FC<DownloadsProps> = ({
                       </span>
                     )}
                     {job.errorMessage && (
-                      <span className="text-rose-400">{job.errorMessage}</span>
+                      <span className="text-rose-400 font-sans font-medium">{job.errorMessage}</span>
                     )}
                   </div>
 
-                  {job.status === 'completed' && (
-                    <button
-                      onClick={() => onInstallDownloaded(job)}
-                      className="px-4 py-1.5 rounded bg-accent hover:bg-accent-hover text-bg-main text-xs font-bold transition-colors shadow"
-                    >
-                      Inspect & Install
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {job.status === 'downloading' && (
+                      <button
+                        onClick={() => onCancelDownload(job.id)}
+                        className="px-3 py-1.5 rounded bg-rose-950/80 hover:bg-rose-900 border border-rose-800/80 text-rose-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        title="Cancel this download immediately"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        <span>Cancel Download</span>
+                      </button>
+                    )}
+
+                    {job.status === 'failed' && (
+                      <>
+                        <button
+                          onClick={() => onDeleteDownload(job.id)}
+                          className="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                          title="Dismiss this failed download record"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-neutral-400" />
+                          <span>Dismiss</span>
+                        </button>
+                        {onRetryDownload && (
+                          <button
+                            onClick={() => onRetryDownload(job)}
+                            className="px-3 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-amber-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            title="Retry download"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Retry</span>
+                          </button>
+                        )}
+                      </>
+                    )}
+
+                    {job.status === 'completed' && (
+                      <>
+                        <button
+                          onClick={() => onDeleteDownload(job.id)}
+                          className="p-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-rose-400 border border-neutral-700 transition-colors cursor-pointer"
+                          title="Remove from download history"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onInstallDownloaded(job)}
+                          className="px-4 py-1.5 rounded bg-accent hover:bg-accent-hover text-bg-main text-xs font-bold transition-colors shadow cursor-pointer"
+                        >
+                          Inspect & Install
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             );

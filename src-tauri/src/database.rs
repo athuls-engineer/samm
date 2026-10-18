@@ -1095,4 +1095,25 @@ impl Database {
         }
         Ok(list)
     }
+
+    pub fn delete_download_job(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM download_jobs WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn clear_completed_downloads(&self) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM download_jobs WHERE status IN ('completed', 'failed', 'cancelled')", [])?;
+        Ok(())
+    }
+
+    pub fn cleanup_orphaned_downloads(&self) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "UPDATE download_jobs SET status = 'failed', error_message = 'Interrupted by application restart' WHERE status = 'downloading'",
+            [],
+        )?;
+        Ok(())
+    }
 }

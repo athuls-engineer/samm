@@ -418,6 +418,21 @@ pub fn get_download_jobs(state: State<'_, Arc<AppState>>) -> Result<Vec<Download
 }
 
 #[tauri::command]
+pub fn cancel_download(job_id: String, state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    state.download_manager.cancel_download(&job_id)
+}
+
+#[tauri::command]
+pub fn delete_download(job_id: String, state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    state.download_manager.delete_download(&job_id)
+}
+
+#[tauri::command]
+pub fn clear_completed_downloads(state: State<'_, Arc<AppState>>) -> Result<(), String> {
+    state.download_manager.clear_finished()
+}
+
+#[tauri::command]
 pub fn launch_game(
     game_id: String,
     custom_args: Vec<String>,
