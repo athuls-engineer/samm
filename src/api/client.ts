@@ -15,6 +15,8 @@ import {
   DownloadedArchiveItem,
   ConflictResolutionResult,
   CacheCleanupResult,
+  DuplicateModGroup,
+  DuplicateResolutionResult,
 } from '../types';
 
 export const api = {
@@ -259,5 +261,17 @@ export const api = {
 
   getRecentDownloadedArchives: async (): Promise<DownloadedArchiveItem[]> => {
     return await invoke('get_recent_downloaded_archives');
+  },
+
+  getDuplicateMods: async (gameId: string): Promise<DuplicateModGroup[]> => {
+    return await invoke('get_duplicate_mods', { gameId });
+  },
+
+  removeDuplicateMod: async (gameId: string, targetId: string): Promise<string> => {
+    return await invoke('remove_duplicate_mod', { gameId, targetId });
+  },
+
+  removeAllDuplicates: async (gameId: string): Promise<DuplicateResolutionResult> => {
+    return await invoke('remove_all_duplicates', { gameId });
   },
 };

@@ -202,8 +202,8 @@ mod tests {
         let detected = scan_existing_mods(root);
 
         // Verify detection
-        assert!(detected.iter().any(|m| m.id == "gtainside_silentpatch"), "SilentPatch should be detected");
-        assert!(detected.iter().any(|m| m.id == "gtainside_widescreen_fix"), "WidescreenFix should be detected");
+        assert!(detected.iter().any(|m| m.id.contains("silentpatch")), "SilentPatch should be detected");
+        assert!(detected.iter().any(|m| m.id.contains("widescreen")), "WidescreenFix should be detected");
         assert!(detected.iter().any(|m| m.id == "libertycity_cleo4"), "CLEO 4 should be detected");
         assert!(detected.iter().any(|m| m.name.contains("RoSA Evolved")), "RoSA Evolved modloader folder should be detected");
         assert!(detected.iter().any(|m| m.name.contains("CarSpawner")), "CarSpawner CLEO script should be detected");
@@ -471,7 +471,7 @@ mod tests {
         // Initial sync: detects SilentPatch
         let synced1 = sync_existing_mods_into_db(&game, "default", &db).unwrap();
         assert_eq!(synced1.len(), 1);
-        assert_eq!(synced1[0].id, "gtainside_silentpatch");
+        assert_eq!(synced1[0].id, "root_asi_silentpatchsa");
 
         let in_db = db.get_installed_mods("game_resync").unwrap();
         assert_eq!(in_db.len(), 1);
@@ -794,6 +794,64 @@ mod tests {
                 println!("Successfully installed into game: {:?}", res.name);
             }
         }
+    }
+
+    #[test]
+    fn test_duplicate_mod_detection_and_safe_removal() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let game_root = temp_dir.path();
+        let db = Database::in_memory().unwrap();
+
+        let game = GameInstallation {
+            id: "game_dup_test".to_string(),
+            name: "GTA San Andreas Duplicates Test".to_string(),
+            root_path: game_root.to_string_lossy().to_string(),
+            executable_path: game_root.join("gta_sa.exe").to_string_lossy().to_string(),
+            version_confidence: ConfidenceLevel::Confirmed,
+            detected_edition: "Standard 1.0".to_string(),
+            executable_sha256: "".to_string(),
+            executable_size_bytes: 0,
+            pe_timestamp: None,
+            evidence_list: Vec::new(),
+            uncertainties: Vec::new(),
+            is_classic_1_0: true,
+            is_active: true,
+            created_date: "".to_string(),
+            last_verified_date: "".to_string(),
+        };
+
+        // Create ModLoader CheatMenu folder
+        let ml_cheat_dir = game_root.join("modloader").join("Cheat_Menu_Trainer");
+        std::fs::create_dir_all(&ml_cheat_dir).unwrap();
+        std::fs::write(ml_cheat_dir.join("menu.dat"), b"textures and data").unwrap();
+
+        // Create redundant root CheatMenu ASI plugin
+        std::fs::write(game_root.join("CheatMenuSA.asi"), b"binary asi").unwrap();
+        std::fs::write(game_root.join("CheatMenuSA.ini"), b"config").unwrap();
+
+        // Scan duplicates
+        let groups = crate::duplicates::scan_all_duplicates(&game, &db);
+        assert_eq!(groups.len(), 1, "Should detect 1 duplicate group");
+        assert_eq!(groups[0].group_id, "cheat_menu");
+        assert_eq!(groups[0].items.len(), 2, "Group should contain ModLoader and Root ASI copies");
+
+        let recommended = groups[0].items.iter().find(|i| i.is_recommended_keep).unwrap();
+        assert_eq!(recommended.location_type, "modloader");
+
+        let redundant = groups[0].items.iter().find(|i| !i.is_recommended_keep).unwrap();
+        assert_eq!(redundant.location_type, "root_asi");
+
+        // Remove all duplicates
+        let res = crate::duplicates::remove_all_duplicates(&game, &db).unwrap();
+        assert_eq!(res.removed_count, 1);
+
+        // Verify root ASI was removed, and consolidated into ModLoader
+        assert!(!game_root.join("CheatMenuSA.asi").exists(), "Root ASI should be removed");
+        assert!(ml_cheat_dir.join("CheatMenuSA.asi").exists(), "ASI should be safely consolidated into ModLoader");
+
+        // After resolution, 0 duplicates remain
+        let after_groups = crate::duplicates::scan_all_duplicates(&game, &db);
+        assert_eq!(after_groups.len(), 0, "No duplicate groups should remain after removal");
     }
 }
 

@@ -10,6 +10,7 @@ import {
   ModRecord,
   InstallationPlan,
   AutoInstallStatus,
+  DuplicateModGroup,
 } from './types';
 import { api } from './api/client';
 import { RotateCcw } from 'lucide-react';
@@ -39,6 +40,7 @@ export const App: React.FC = () => {
   const [installedMods, setInstalledMods] = useState<InstalledMod[]>([]);
   const [sources, setSources] = useState<ModSource[]>([]);
   const [conflicts, setConflicts] = useState<FileConflict[]>([]);
+  const [duplicates, setDuplicates] = useState<DuplicateModGroup[]>([]);
   const [backups, setBackups] = useState<BackupRecord[]>([]);
   const [downloadJobs, setDownloadJobs] = useState<DownloadJob[]>([]);
   const [autoInstallStates, setAutoInstallStates] = useState<Record<string, AutoInstallStatus>>({});
@@ -82,11 +84,12 @@ export const App: React.FC = () => {
 
       if (active) {
         // 2. Run active game queries concurrently in parallel
-        const [profs, mods, confs, bks] = await Promise.all([
+        const [profs, mods, confs, bks, dups] = await Promise.all([
           api.getProfiles(active.id),
           api.getInstalledMods(active.id),
           api.getConflicts(active.id),
           api.getBackups(active.id),
+          api.getDuplicateMods(active.id),
         ]);
 
         setProfiles(profs);
@@ -95,11 +98,13 @@ export const App: React.FC = () => {
         setInstalledMods(mods);
         setConflicts(confs);
         setBackups(bks);
+        setDuplicates(dups);
       } else {
         setProfiles([]);
         setActiveProfile(null);
         setInstalledMods([]);
         setConflicts([]);
+        setDuplicates([]);
         setBackups([]);
       }
     } catch (e) {
@@ -680,7 +685,7 @@ export const App: React.FC = () => {
         onSelectTab={setCurrentTab}
         installedCount={installedMods.length}
         downloadCount={downloadJobs.filter((j) => j.status === 'downloading').length}
-        conflictCount={conflicts.length}
+        conflictCount={conflicts.length + duplicates.length}
       />
 
       {/* Main Content Area */}
@@ -736,6 +741,7 @@ export const App: React.FC = () => {
               activeProfile={activeProfile}
               installedMods={installedMods}
               conflictsCount={conflicts.length}
+              duplicatesCount={duplicates.length}
               backupsCount={backups.length}
               isGameRunning={isGameRunning}
               onNavigate={setCurrentTab}
@@ -832,6 +838,7 @@ export const App: React.FC = () => {
           {currentTab === 'conflicts' && (
             <Conflicts
               conflicts={conflicts}
+              duplicates={duplicates}
               activeGame={activeGame}
               onRefresh={loadData}
               onToast={showToast}

@@ -307,3 +307,36 @@ pub struct AppSettings {
     pub auto_detect_game_on_startup: Option<bool>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateModItem {
+    pub id: String,
+    pub name: String,
+    pub location_type: String,
+    pub primary_path: String,
+    pub file_count: usize,
+    pub size_bytes: u64,
+    pub size_formatted: String,
+    pub is_active: bool,
+    pub is_recommended_keep: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateModGroup {
+    pub group_id: String,
+    pub mod_title: String,
+    pub reason: String,
+    pub recommended_keep_id: String,
+    pub duplicates_to_remove: Vec<String>,
+    pub items: Vec<DuplicateModItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateResolutionResult {
+    pub removed_count: usize,
+    pub bytes_freed: u64,
+    pub removed_items: Vec<String>,
+}
+

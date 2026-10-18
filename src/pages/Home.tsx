@@ -23,6 +23,7 @@ interface HomeProps {
   activeProfile: Profile | null;
   installedMods: InstalledMod[];
   conflictsCount: number;
+  duplicatesCount?: number;
   backupsCount: number;
   isGameRunning?: boolean;
   onNavigate: (tab: any) => void;
@@ -36,6 +37,7 @@ export const Home: React.FC<HomeProps> = ({
   activeProfile,
   installedMods,
   conflictsCount,
+  duplicatesCount = 0,
   backupsCount,
   isGameRunning = false,
   onNavigate,
@@ -186,14 +188,16 @@ export const Home: React.FC<HomeProps> = ({
           className="bg-bg-card hover:bg-bg-hover border border-border p-4 rounded-lg cursor-pointer transition-colors space-y-1"
         >
           <div className="flex items-center justify-between text-neutral-400">
-            <span className="text-xs font-medium">File Conflicts</span>
-            <AlertTriangle className={`w-4 h-4 ${conflictsCount > 0 ? 'text-amber-400' : 'text-neutral-500'}`} />
+            <span className="text-xs font-medium">Conflicts & Duplicates</span>
+            <AlertTriangle className={`w-4 h-4 ${conflictsCount + duplicatesCount > 0 ? 'text-amber-400' : 'text-neutral-500'}`} />
           </div>
-          <div className={`text-2xl font-black font-mono ${conflictsCount > 0 ? 'text-amber-400' : 'text-white'}`}>
-            {conflictsCount}
+          <div className={`text-2xl font-black font-mono ${conflictsCount + duplicatesCount > 0 ? 'text-amber-400' : 'text-white'}`}>
+            {conflictsCount + duplicatesCount}
           </div>
-          <div className="text-[11px] text-neutral-400">
-            {conflictsCount === 0 ? 'Zero conflicts' : `${conflictsCount} conflicts detected`}
+          <div className="text-[11px] text-neutral-400 truncate">
+            {conflictsCount + duplicatesCount === 0
+              ? 'Zero issues detected'
+              : `${duplicatesCount} duplicate${duplicatesCount === 1 ? '' : 's'}, ${conflictsCount} collision${conflictsCount === 1 ? '' : 's'}`}
           </div>
         </div>
 

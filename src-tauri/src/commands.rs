@@ -1025,3 +1025,40 @@ pub fn batch_uninstall_mods(
     }
     Ok(())
 }
+
+#[tauri::command]
+pub fn get_duplicate_mods(
+    game_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<DuplicateModGroup>, String> {
+    let games = state.db.get_game_installations().map_err(|e| e.to_string())?;
+    let game = games.into_iter().find(|g| g.id == game_id)
+        .ok_or_else(|| format!("Game installation '{}' not found", game_id))?;
+
+    Ok(crate::duplicates::scan_all_duplicates(&game, &state.db))
+}
+
+#[tauri::command]
+pub fn remove_duplicate_mod(
+    game_id: String,
+    target_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<String, String> {
+    let games = state.db.get_game_installations().map_err(|e| e.to_string())?;
+    let game = games.into_iter().find(|g| g.id == game_id)
+        .ok_or_else(|| format!("Game installation '{}' not found", game_id))?;
+
+    crate::duplicates::remove_duplicate_mod(&game, &target_id, &state.db)
+}
+
+#[tauri::command]
+pub fn remove_all_duplicates(
+    game_id: String,
+    state: State<'_, Arc<AppState>>,
+) -> Result<DuplicateResolutionResult, String> {
+    let games = state.db.get_game_installations().map_err(|e| e.to_string())?;
+    let game = games.into_iter().find(|g| g.id == game_id)
+        .ok_or_else(|| format!("Game installation '{}' not found", game_id))?;
+
+    crate::duplicates::remove_all_duplicates(&game, &state.db)
+}

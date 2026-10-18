@@ -166,21 +166,51 @@ pub fn scan_existing_mods(root_path: &Path) -> Vec<DetectedModInfo> {
             let path = entry.path();
             if path.is_file() {
                 let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-                let ext = path.extension().unwrap_or_default().to_string_lossy().to_lowercase();
                 let is_disabled = file_name.ends_with(".asi.disabled");
-                let is_asi = ext == "asi" || is_disabled;
+                let is_asi = file_name.ends_with(".asi") || is_disabled;
                 if is_asi {
                     let is_enabled = !is_disabled;
                     let lower = file_name.to_lowercase();
+                    let clean_stem = if is_disabled {
+                        file_name.trim_end_matches(".disabled").trim_end_matches(".asi").to_string()
+                    } else {
+                        path.file_stem().unwrap_or_default().to_string_lossy().to_string()
+                    };
+
                     let mut rel_files = vec![file_name.clone()];
                     claimed_files.insert(file_name.clone());
 
-                    // Look for matching .ini
-                    let ini_name = path.with_extension("ini");
-                    if ini_name.is_file() {
-                        let ini_rel = ini_name.file_name().unwrap().to_string_lossy().to_string();
-                        rel_files.push(ini_rel.clone());
-                        claimed_files.insert(ini_rel);
+                    // Look for companion files (.ini, .toml, .cfg, .dat, .log, .sp, .fp, .dll)
+                    for ext_test in ["ini", "toml", "cfg", "dat", "log", "sp", "fp", "dll"] {
+                        let comp_name = format!("{}.{}", clean_stem, ext_test);
+                        let comp_dis_name = format!("{}.{}.disabled", clean_stem, ext_test);
+                        if root_path.join(&comp_name).is_file() && !rel_files.contains(&comp_name) {
+                            rel_files.push(comp_name.clone());
+                            claimed_files.insert(comp_name);
+                        } else if root_path.join(&comp_dis_name).is_file() && !rel_files.contains(&comp_dis_name) {
+                            rel_files.push(comp_dis_name.clone());
+                            claimed_files.insert(comp_dis_name);
+                        }
+                    }
+
+                    // Special companion files for SkyGfx (skygfx1.ini, skygfx2.ini, skygfx3.ini)
+                    if lower.contains("skygfx") {
+                        for idx in 1..=4 {
+                            let ini_name = format!("skygfx{}.ini", idx);
+                            if root_path.join(&ini_name).is_file() && !rel_files.contains(&ini_name) {
+                                rel_files.push(ini_name.clone());
+                                claimed_files.insert(ini_name);
+                            }
+                        }
+                    }
+
+                    // Look for matching companion directory in root (e.g. CheatMenuSA/)
+                    let companion_dir = root_path.join(&clean_stem);
+                    if companion_dir.is_dir() {
+                        collect_files_recursive(&companion_dir, root_path, &mut rel_files);
+                        for f in &rel_files {
+                            claimed_files.insert(f.clone());
+                        }
                     }
 
                     let (id, name, author, cat) = if lower.contains("modloader") {
@@ -188,44 +218,45 @@ pub fn scan_existing_mods(root_path: &Path) -> Vec<DetectedModInfo> {
                     } else if lower.contains("rainbomizer") || lower.contains("randomizer") || lower.contains("randomiser") {
                         ("github_rainbomizer".to_string(), "San Andreas Rainbomizer (Chaos & Randomizer Mod)".to_string(), "Parik27 & 123robot".to_string(), "Gameplay / Scripts".to_string())
                     } else if lower.contains("crashinfo") {
-                        ("mixmods_crashinfo".to_string(), "CrashInfo.SA Crash Logger & Analyzer".to_string(), "Junior_Djjr".to_string(), "Essential Fixes".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "CrashInfo.SA Crash Logger & Analyzer".to_string(), "Junior_Djjr".to_string(), "Essential Fixes".to_string())
                     } else if lower.contains("firstperson") {
-                        ("gtainside_first_person".to_string(), "First Person Mod Fixed".to_string(), "BoPoH".to_string(), "Gameplay / Scripts".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "First Person Mod Fixed (Root ASI)".to_string(), "BoPoH".to_string(), "Gameplay / Scripts".to_string())
                     } else if lower.contains("gps") {
-                        ("mixmods_gps_redux".to_string(), "SA.GPS.REDUX Radar & Map Route".to_string(), "Junior_Djjr".to_string(), "HUD / Radar".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "SA.GPS.REDUX Radar & Map Route".to_string(), "Junior_Djjr".to_string(), "HUD / Radar".to_string())
                     } else if lower.contains("nodep") {
-                        ("mixmods_nodep".to_string(), "NoDEP Data Execution Prevention Disabler".to_string(), "Silent".to_string(), "Essential Fixes".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "NoDEP Data Execution Prevention Disabler".to_string(), "Silent".to_string(), "Essential Fixes".to_string())
                     } else if lower.contains("silentpatch") {
-                        ("gtainside_silentpatch".to_string(), "SilentPatch for GTA San Andreas".to_string(), "Silent".to_string(), "Plugins / ASI".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "SilentPatch for GTA San Andreas (Root ASI)".to_string(), "Silent".to_string(), "Plugins / ASI".to_string())
                     } else if lower.contains("widescreen") {
-                        ("gtainside_widescreen_fix".to_string(), "Widescreen Fix & Aspect Ratio Correction".to_string(), "ThirteenAG".to_string(), "Plugins / ASI".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "Widescreen Fix & Aspect Ratio Correction (Root ASI)".to_string(), "ThirteenAG".to_string(), "Plugins / ASI".to_string())
                     } else if lower.contains("skygfx") {
-                        ("libertycity_skygfx".to_string(), "SkyGfx 4.2b (PS2 Graphics & Visual Pipeline)".to_string(), "aap (The Hero)".to_string(), "Graphics / Plugins".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "SkyGfx 4.2b (PS2 Graphics & Visual Pipeline - Root ASI)".to_string(), "aap (The Hero)".to_string(), "Graphics / Plugins".to_string())
                     } else if lower.contains("salodlights") || lower.contains("project2dfx") {
-                        ("gtainside_project2dfx".to_string(), "Project 2DFX (Max Draw Distance & LODs)".to_string(), "ThirteenAG & TJDS".to_string(), "Graphics / Plugins".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "Project 2DFX / SALodLights (Root ASI)".to_string(), "ThirteenAG & TJDS".to_string(), "Graphics / Plugins".to_string())
                     } else if lower.contains("wndmode") {
-                        ("mixmods_windowed_mode".to_string(), "Windowed Mode Borderless (wndmode)".to_string(), "ThirteenAG".to_string(), "Plugins / ASI".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "Windowed Mode Borderless (Root ASI)".to_string(), "ThirteenAG".to_string(), "Plugins / ASI".to_string())
                     } else if lower.contains("framerate") || lower.contains("vigilante") {
-                        ("mixmods_framerate_vigilante".to_string(), "Framerate Vigilante (60FPS Physics Fix)".to_string(), "Junior_Djjr".to_string(), "Essential Fixes".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "Framerate Vigilante (60FPS Physics Fix - Root ASI)".to_string(), "Junior_Djjr".to_string(), "Essential Fixes".to_string())
+                    } else if lower.contains("cheatmenu") {
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "Cheat Menu Ultimate GUI (Root ASI)".to_string(), "CheatMenu Team".to_string(), "Gameplay / Scripts".to_string())
                     } else if lower.contains("ginput") {
-                        ("local_ginput".to_string(), "GInput (Controller Support)".to_string(), "Silent".to_string(), "Plugins / ASI".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "GInput (Controller Support)".to_string(), "Silent".to_string(), "Plugins / ASI".to_string())
                     } else if lower.contains("cleo") {
                         ("libertycity_cleo4".to_string(), "CLEO 4.4.4 Scripting Library".to_string(), "Seemann & Alien".to_string(), "Tools / Frameworks".to_string())
                     } else if lower.contains("fastman92") {
-                        ("mixmods_fastman92_limit_adjuster".to_string(), "Fastman92 Limit Adjuster".to_string(), "fastman92".to_string(), "Tools / Frameworks".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "Fastman92 Limit Adjuster".to_string(), "fastman92".to_string(), "Tools / Frameworks".to_string())
                     } else if lower.contains("openlimit") || lower.contains("limitadjuster") {
-                        ("mixmods_open_limit_adjuster".to_string(), "Open Limit Adjuster".to_string(), "LINK/2012".to_string(), "Tools / Frameworks".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "Limit Adjuster (Open/III.VC.SA)".to_string(), "LINK/2012 & ThirteenAG".to_string(), "Tools / Frameworks".to_string())
                     } else if lower.contains("imvehft") || lower.contains("ivf") {
-                        ("mixmods_imveft".to_string(), "Improved Vehicle Features (IVF)".to_string(), "DK22Pac".to_string(), "Plugins / ASI".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "Improved Vehicle Features (IVF)".to_string(), "DK22Pac".to_string(), "Plugins / ASI".to_string())
                     } else if lower.contains("vehfuncs") {
-                        ("mixmods_vehfuncs".to_string(), "VehFuncs (Dynamic Vehicle Features)".to_string(), "Junior_Djjr".to_string(), "Plugins / ASI".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "VehFuncs (Dynamic Vehicle Features)".to_string(), "Junior_Djjr".to_string(), "Plugins / ASI".to_string())
                     } else if lower.contains("pedfuncs") {
-                        ("mixmods_pedfuncs".to_string(), "PedFuncs (Pedestrian Variation)".to_string(), "Junior_Djjr".to_string(), "Plugins / ASI".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "PedFuncs (Pedestrian Variation)".to_string(), "Junior_Djjr".to_string(), "Plugins / ASI".to_string())
                     } else if lower.contains("mixsets") {
-                        ("mixmods_mixsets".to_string(), "MixSets (Engine Tweaker)".to_string(), "Junior_Djjr".to_string(), "Plugins / ASI".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), "MixSets (Engine Tweaker)".to_string(), "Junior_Djjr".to_string(), "Plugins / ASI".to_string())
                     } else {
-                        let stem = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
-                        (format!("local_asi_{}", clean_slug(&stem)), format!("{} (ASI Plugin)", stem), "Local Plugin".to_string(), "Plugins / ASI".to_string())
+                        (format!("root_asi_{}", clean_slug(&clean_stem)), format!("{} (Root ASI Plugin)", clean_stem), "Local Plugin".to_string(), "Plugins / ASI".to_string())
                     };
 
                     if id == "github_rainbomizer" {
@@ -248,7 +279,7 @@ pub fn scan_existing_mods(root_path: &Path) -> Vec<DetectedModInfo> {
                         version: "1.0".to_string(),
                         category: cat,
                         strategy: "asi".to_string(),
-                        source_name: "Pre-installed (ASI)".to_string(),
+                        source_name: "Pre-installed (Root ASI)".to_string(),
                         relative_files: rel_files,
                         is_enabled,
                     });
@@ -493,6 +524,71 @@ pub fn scan_existing_mods(root_path: &Path) -> Vec<DetectedModInfo> {
         });
     }
 
+    // 8. Loose Root Mod Folders (non-vanilla directories such as [mods]-*, atp, etc.)
+    const VANILLA_ROOT_DIRS: &[&str] = &[
+        "anim", "audio", "data", "models", "movies", "text", "readme", "samp",
+        "modloader", "cleo", "scripts", "$recycle.bin", "system volume information",
+    ];
+
+    if let Ok(entries) = fs::read_dir(root_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let folder_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                let lower = folder_name.to_lowercase();
+                if lower.starts_with('.') || lower.contains("readme") || lower.contains("dependencies") || VANILLA_ROOT_DIRS.contains(&lower.as_str()) {
+                    continue;
+                }
+
+                let mut folder_files = Vec::new();
+                collect_files_recursive(&path, root_path, &mut folder_files);
+                if folder_files.is_empty() || folder_files.iter().all(|f| claimed_files.contains(f)) {
+                    continue;
+                }
+
+                let is_enabled = !folder_name.ends_with(".disabled");
+                let clean_name = folder_name.trim_end_matches(".disabled");
+                let clean_lower = clean_name.to_lowercase();
+
+                let (id, name, cat) = if clean_lower.contains("tsunami") {
+                    ("local_loose_tsunami".to_string(), "Tsunami Water Mod (Loose Folder)".to_string(), "Environment / Weather".to_string())
+                } else if clean_lower.contains("atp") {
+                    ("local_loose_atp".to_string(), "Animated Traffic Police (ATP)".to_string(), "Scripts / Plugins".to_string())
+                } else if clean_lower.contains("cheatmenu") {
+                    ("local_loose_cheat_menu".to_string(), "Cheat Menu Assets (Loose Folder)".to_string(), "Gameplay / Scripts".to_string())
+                } else {
+                    let display_title = clean_name
+                        .replace('[', " ")
+                        .replace(']', " ")
+                        .replace('-', " ")
+                        .replace('_', " ");
+                    let title = display_title.split_whitespace().collect::<Vec<_>>().join(" ");
+                    (
+                        format!("local_loose_{}", clean_slug(clean_name)),
+                        format!("{} (Loose Mod Folder)", title),
+                        "Custom / Loose Mods".to_string(),
+                    )
+                };
+
+                for f in &folder_files {
+                    claimed_files.insert(f.clone());
+                }
+
+                detected.push(DetectedModInfo {
+                    id,
+                    name,
+                    author: "Local Folder".to_string(),
+                    version: "1.0".to_string(),
+                    category: cat,
+                    strategy: "root_loose".to_string(),
+                    source_name: "Pre-installed (Loose Root Folder)".to_string(),
+                    relative_files: folder_files,
+                    is_enabled,
+                });
+            }
+        }
+    }
+
     detected
 }
 
@@ -648,4 +744,8 @@ fn clean_slug(s: &str) -> String {
         .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
         .collect::<String>()
         .to_lowercase()
+}
+
+pub fn clean_slug_pub(s: &str) -> String {
+    clean_slug(s)
 }

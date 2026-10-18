@@ -263,3 +263,30 @@ export interface DownloadedArchiveItem {
   fileSizeBytes: number;
   modifiedTimestamp: number;
 }
+
+export interface DuplicateModItem {
+  id: string;
+  name: string;
+  locationType: 'modloader' | 'root_asi' | 'scripts' | 'cleo' | 'loose_folder';
+  primaryPath: string;
+  fileCount: number;
+  sizeBytes: number;
+  sizeFormatted: string;
+  isActive: boolean;
+  isRecommendedKeep: boolean;
+}
+
+export interface DuplicateModGroup {
+  groupId: string;
+  modTitle: string;
+  reason: string;
+  recommendedKeepId: string;
+  duplicatesToRemove: string[];
+  items: DuplicateModItem[];
+}
+
+export interface DuplicateResolutionResult {
+  removedCount: number;
+  bytesFreed: number;
+  removedItems: string[];
+}

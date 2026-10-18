@@ -10,6 +10,7 @@ pub mod downloads;
 pub mod game_launch;
 pub mod diagnostics;
 pub mod existing_mods;
+pub mod duplicates;
 pub mod commands;
 #[cfg(test)]
 mod tests;
@@ -179,6 +180,9 @@ pub fn run() {
             commands::get_recent_downloaded_archives,
             commands::clear_download_cache,
             commands::purge_stale_backups,
+            commands::get_duplicate_mods,
+            commands::remove_duplicate_mod,
+            commands::remove_all_duplicates,
         ])
         .build(tauri::generate_context!()) {
             Ok(a) => {
