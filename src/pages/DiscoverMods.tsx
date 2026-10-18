@@ -91,6 +91,7 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
 
   const quickFilterTabs = [
     { id: 'Essential & Popular', label: 'Essential & Popular' },
+    { id: 'Goofy & Memes', label: 'Goofy & Memes' },
     { id: 'All', label: 'All Mods' },
     { id: 'Plugins / ASI', label: 'ASI & Engine Fixes' },
     { id: 'Total Conversions', label: 'Total Conversions & Maps' },
