@@ -692,6 +692,25 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn test_one_click_mods_exceed_150_and_catalog_exceeds_500() {
+        use crate::sources::SourceManager;
+        let source_mgr = SourceManager::new();
+        let all_mods = source_mgr.search_all("", None, None).await;
+        let one_click_count = all_mods.iter().filter(|m| m.download_url.is_some()).count();
+        println!("Total catalog mods: {}, One-click installable mods: {}", all_mods.len(), one_click_count);
+        assert!(
+            all_mods.len() >= 500,
+            "Expected at least 500 mods in total catalog, found {}",
+            all_mods.len()
+        );
+        assert!(
+            one_click_count >= 150,
+            "Expected at least 150 1-click installable mods, found {}",
+            one_click_count
+        );
+    }
+
     #[test]
     fn test_7z_inspection_and_variant_resolution() {
         let sample_7z = std::path::Path::new(r"C:\Users\athul_nuy2ni9\Downloads\Loadscreens_4K_Definitive.7z");
