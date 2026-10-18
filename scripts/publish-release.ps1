@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "v0.2.0",
+    [string]$Version = "v1.0.0",
     [string]$Title = "SAMM Release $Version",
     [string]$Notes = "Features 636 curated mods with 622 1-click installable packages, auto-duplicate detection and resolution engine, robust single-instance startup, crash recovery, and custom themes."
 )

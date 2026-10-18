@@ -535,7 +535,7 @@ export const Settings: React.FC = () => {
             </h2>
           </div>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700">
-            Version 0.1.0 (Production Release)
+            Version 1.0.0 (Production Release)
           </span>
         </div>
 
