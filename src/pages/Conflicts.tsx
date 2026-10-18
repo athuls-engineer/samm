@@ -43,6 +43,7 @@ export const Conflicts: React.FC<ConflictsProps> = ({
   const [removingDupId, setRemovingDupId] = useState<string | null>(null);
   const [removingAllDups, setRemovingAllDups] = useState(false);
   const [scanningDuplicates, setScanningDuplicates] = useState(false);
+  const [selectedKeepMap, setSelectedKeepMap] = useState<Record<string, string>>({});
 
   // Duplicates Handlers
   const handleScanDuplicates = async () => {
@@ -323,8 +324,9 @@ export const Conflicts: React.FC<ConflictsProps> = ({
           ) : (
             <div className="space-y-4">
               {duplicates.map((group) => {
-                const redundantItems = group.items.filter((i) => !i.isRecommendedKeep);
-                const recommendedItem = group.items.find((i) => i.isRecommendedKeep) || group.items[0];
+                const activeKeepId = selectedKeepMap[group.groupId] || group.recommendedKeepId || group.items[0]?.id;
+                const recommendedItem = group.items.find((i) => i.id === activeKeepId) || group.items[0];
+                const redundantItems = group.items.filter((i) => i.id !== activeKeepId);
 
                 return (
                   <div
@@ -333,7 +335,7 @@ export const Conflicts: React.FC<ConflictsProps> = ({
                   >
                     {/* Group Header */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border-subtle pb-3">
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2.5 flex-wrap">
                         <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
                         <h2 className="text-sm font-bold text-white tracking-wide">{group.modTitle}</h2>
                         <span className="text-[10px] font-mono uppercase bg-amber-950/80 text-amber-300 border border-amber-800 px-2 py-0.5 rounded font-bold">
@@ -341,9 +343,27 @@ export const Conflicts: React.FC<ConflictsProps> = ({
                         </span>
                       </div>
 
-                      <span className="text-[11px] font-mono text-neutral-400">
-                        Family: <code className="text-neutral-300">{group.groupId}</code>
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[11px] font-mono text-neutral-400">
+                          Family: <code className="text-neutral-300">{group.groupId}</code>
+                        </span>
+
+                        {redundantItems.length > 0 && (
+                          <button
+                            onClick={async () => {
+                              for (const item of redundantItems) {
+                                await handleRemoveSingleDuplicate(item.id, item.name);
+                              }
+                            }}
+                            disabled={removingAllDups || Boolean(removingDupId)}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-rose-950/80 hover:bg-rose-900 border border-rose-800 text-rose-200 text-xs font-semibold transition-colors disabled:opacity-50"
+                            title="Uninstall all redundant duplicates in this group"
+                          >
+                            <Trash2 className="w-3 h-3 text-rose-400" />
+                            <span>Remove {redundantItems.length} Duplicate{redundantItems.length === 1 ? '' : 's'}</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Conflict Explanation */}
@@ -353,29 +373,47 @@ export const Conflicts: React.FC<ConflictsProps> = ({
                     </div>
 
                     {/* Versions Comparison Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Version 1: Recommended Keep */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {/* Version 1: Recommended / Selected Keep */}
                       {recommendedItem && (
-                        <div className="bg-emerald-950/20 border border-emerald-800/80 rounded-md p-4 space-y-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800 font-mono flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3" /> Recommended Keep
-                            </span>
-                            <span className="text-[10px] font-mono text-emerald-300 font-semibold uppercase">
-                              {recommendedItem.locationType === 'modloader' ? 'ModLoader Isolated' : recommendedItem.locationType}
-                            </span>
-                          </div>
+                        <div className="bg-emerald-950/20 border border-emerald-800/80 rounded-md p-4 space-y-3 flex flex-col justify-between">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800 font-mono flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3" /> Recommended Keep
+                              </span>
+                              <span className="text-[10px] font-mono text-emerald-300 font-semibold uppercase">
+                                {recommendedItem.locationType === 'modloader' ? 'ModLoader Isolated' : recommendedItem.locationType}
+                              </span>
+                            </div>
 
-                          <div className="space-y-1">
-                            <div className="text-xs font-bold text-white truncate">{recommendedItem.name}</div>
-                            <div className="text-[11px] font-mono text-neutral-400 truncate" title={recommendedItem.primaryPath}>
-                              Path: {recommendedItem.primaryPath}
+                            <div className="space-y-1">
+                              <div className="text-xs font-bold text-white truncate" title={recommendedItem.name}>
+                                {recommendedItem.name}
+                              </div>
+                              <div className="text-[11px] font-mono text-neutral-400 truncate" title={recommendedItem.primaryPath}>
+                                Path: {recommendedItem.primaryPath}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-1 border-t border-emerald-900/40 text-[11px] text-neutral-400 font-mono">
+                              <span>{recommendedItem.fileCount} file{recommendedItem.fileCount === 1 ? '' : 's'}</span>
+                              <span className="text-emerald-400 font-semibold">{recommendedItem.sizeFormatted}</span>
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between pt-1 border-t border-emerald-900/40 text-[11px] text-neutral-400 font-mono">
-                            <span>{recommendedItem.fileCount} file{recommendedItem.fileCount === 1 ? '' : 's'}</span>
-                            <span className="text-emerald-400 font-semibold">{recommendedItem.sizeFormatted}</span>
+                          <div className="pt-2 flex items-center justify-between text-[11px] border-t border-emerald-900/30">
+                            <span className="text-emerald-400/90 font-medium text-[10px] flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Preserved Version
+                            </span>
+                            <button
+                              onClick={() => handleRemoveSingleDuplicate(recommendedItem.id, recommendedItem.name)}
+                              disabled={removingDupId === recommendedItem.id || removingAllDups}
+                              className="text-neutral-500 hover:text-rose-400 text-[10px] underline transition-colors disabled:opacity-50"
+                              title="Uninstall this copy as well"
+                            >
+                              Uninstall
+                            </button>
                           </div>
                         </div>
                       )}
@@ -400,7 +438,9 @@ export const Conflicts: React.FC<ConflictsProps> = ({
                               </div>
 
                               <div className="space-y-1">
-                                <div className="text-xs font-bold text-white truncate">{item.name}</div>
+                                <div className="text-xs font-bold text-white truncate" title={item.name}>
+                                  {item.name}
+                                </div>
                                 <div className="text-[11px] font-mono text-neutral-400 truncate" title={item.primaryPath}>
                                   Path: {item.primaryPath}
                                 </div>
@@ -412,19 +452,28 @@ export const Conflicts: React.FC<ConflictsProps> = ({
                               </div>
                             </div>
 
-                            {/* Direct Action Button */}
-                            <div className="pt-2">
+                            {/* Actions: Keep This Copy Instead OR Uninstall Duplicate */}
+                            <div className="pt-2 flex items-center gap-2">
+                              <button
+                                onClick={() => setSelectedKeepMap((prev) => ({ ...prev, [group.groupId]: item.id }))}
+                                className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white text-[11px] font-semibold border border-neutral-700 transition-colors shadow-sm"
+                                title="Keep this version and mark other copies as redundant"
+                              >
+                                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                <span>Keep Instead</span>
+                              </button>
+
                               <button
                                 onClick={() => handleRemoveSingleDuplicate(item.id, item.name)}
                                 disabled={isRemoving}
-                                className="w-full flex items-center justify-center gap-2 px-3 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors shadow-sm disabled:opacity-50"
+                                className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold transition-colors shadow-sm disabled:opacity-50"
                               >
                                 {isRemoving ? (
-                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
                                 ) : (
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <Trash2 className="w-3 h-3" />
                                 )}
-                                <span>{isRemoving ? 'Uninstalling...' : 'Uninstall Duplicate'}</span>
+                                <span>{isRemoving ? 'Removing...' : 'Uninstall'}</span>
                               </button>
                             </div>
                           </div>

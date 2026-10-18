@@ -853,5 +853,76 @@ mod tests {
         let after_groups = crate::duplicates::scan_all_duplicates(&game, &db);
         assert_eq!(after_groups.len(), 0, "No duplicate groups should remain after removal");
     }
+
+    #[test]
+    fn test_multiple_modloader_duplicate_copies_keep_invariant() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let game_root = temp_dir.path();
+        let db = Database::in_memory().unwrap();
+
+        let game = GameInstallation {
+            id: "game_dup_multi".to_string(),
+            name: "GTA San Andreas Multi-Duplicate Test".to_string(),
+            root_path: game_root.to_string_lossy().to_string(),
+            executable_path: game_root.join("gta_sa.exe").to_string_lossy().to_string(),
+            version_confidence: ConfidenceLevel::Confirmed,
+            detected_edition: "Standard 1.0".to_string(),
+            executable_sha256: "".to_string(),
+            executable_size_bytes: 0,
+            pe_timestamp: None,
+            evidence_list: Vec::new(),
+            uncertainties: Vec::new(),
+            is_classic_1_0: true,
+            is_active: true,
+            created_date: "".to_string(),
+            last_verified_date: "".to_string(),
+        };
+
+        // Create 3 separate ModLoader copies of Loading Screens
+        let ml_dir1 = game_root.join("modloader").join("SA_Loadscreens_4K_Definitive_v11").join("models").join("txd");
+        let ml_dir2 = game_root.join("modloader").join("Loadscreens_Backup").join("models").join("txd");
+        let ml_dir3 = game_root.join("modloader").join("Alt_Loadscreens").join("models").join("txd");
+
+        std::fs::create_dir_all(&ml_dir1).unwrap();
+        std::fs::create_dir_all(&ml_dir2).unwrap();
+        std::fs::create_dir_all(&ml_dir3).unwrap();
+
+        // Give copy 1 the largest size (e.g. 500 bytes vs 100 bytes vs 50 bytes)
+        std::fs::write(ml_dir1.join("LOADSCS.txd"), vec![0u8; 500]).unwrap();
+        std::fs::write(ml_dir2.join("LOADSCS.txd"), vec![0u8; 100]).unwrap();
+        std::fs::write(ml_dir3.join("LOADSCS.txd"), vec![0u8; 50]).unwrap();
+
+        // Scan duplicates
+        let groups = crate::duplicates::scan_all_duplicates(&game, &db);
+        assert_eq!(groups.len(), 1, "Should detect 1 duplicate group");
+        assert_eq!(groups[0].group_id, "loadscreens");
+        assert_eq!(groups[0].items.len(), 3, "All 3 ModLoader copies must be detected in group");
+
+        // Verify INVARIANT: Exactly 1 item is recommended keep, exactly 2 are redundant duplicates
+        let kept_items: Vec<_> = groups[0].items.iter().filter(|i| i.is_recommended_keep).collect();
+        let redundant_items: Vec<_> = groups[0].items.iter().filter(|i| !i.is_recommended_keep).collect();
+
+        assert_eq!(kept_items.len(), 1, "Exactly one item must be marked as recommended keep");
+        assert_eq!(redundant_items.len(), 2, "All other copies must be marked as redundant duplicates");
+        assert_eq!(groups[0].duplicates_to_remove.len(), 2, "duplicates_to_remove must contain exactly the 2 redundant copies");
+
+        // The recommended copy should be the largest one (copy 1)
+        assert_eq!(kept_items[0].size_bytes, 500);
+
+        // Remove all duplicates
+        let res = crate::duplicates::remove_all_duplicates(&game, &db).unwrap();
+        assert_eq!(res.removed_count, 2, "Must remove exactly the 2 redundant copies");
+
+        // Verify kept version is intact
+        assert!(game_root.join("modloader").join("SA_Loadscreens_4K_Definitive_v11").join("models").join("txd").join("LOADSCS.txd").exists(), "Kept copy must remain intact");
+
+        // Verify redundant versions were deleted
+        assert!(!game_root.join("modloader").join("Loadscreens_Backup").exists(), "Redundant copy 2 must be deleted");
+        assert!(!game_root.join("modloader").join("Alt_Loadscreens").exists(), "Redundant copy 3 must be deleted");
+
+        // Clean re-scan confirms zero duplicates remain
+        let after = crate::duplicates::scan_all_duplicates(&game, &db);
+        assert_eq!(after.len(), 0, "Zero duplicates remain after cleanup");
+    }
 }
 

@@ -45,6 +45,9 @@ pub fn normalize_mod_family(raw: &str) -> String {
     if cleaned.contains("rundll32") {
         return "rundll32_fix".to_string();
     }
+    if cleaned.contains("remastered") && cleaned.contains("gui") {
+        return "remastered_gui".to_string();
+    }
     if cleaned.contains("loadscreen") || cleaned.contains("loadscs") {
         return "loadscreens".to_string();
     }
@@ -65,9 +68,6 @@ pub fn normalize_mod_family(raw: &str) -> String {
     }
     if cleaned.contains("crashinfo") {
         return "crash_info".to_string();
-    }
-    if cleaned.contains("remastered") && cleaned.contains("gui") {
-        return "remastered_gui".to_string();
     }
     if cleaned.contains("customskins") || cleaned.contains("custom_skins") {
         return "custom_skins".to_string();
@@ -246,27 +246,34 @@ pub fn scan_all_duplicates(game: &GameInstallation, db: &Database) -> Vec<Duplic
             continue;
         }
 
-        // Sort items so recommended_keep is first (ModLoader copy, or largest)
+        // Sort items so preferred copy is first:
+        // 1. ModLoader over non-ModLoader (isolated directory over root placement)
+        // 2. Active over disabled
+        // 3. Highest file count
+        // 4. Largest size
         items.sort_by(|a, b| {
-            if a.is_recommended_keep != b.is_recommended_keep {
-                return b.is_recommended_keep.cmp(&a.is_recommended_keep);
+            let a_is_ml = a.location_type == "modloader";
+            let b_is_ml = b.location_type == "modloader";
+            if a_is_ml != b_is_ml {
+                return b_is_ml.cmp(&a_is_ml);
             }
-            b.file_count.cmp(&a.file_count)
+            if a.is_active != b.is_active {
+                return b.is_active.cmp(&a.is_active);
+            }
+            if a.file_count != b.file_count {
+                return b.file_count.cmp(&a.file_count);
+            }
+            b.size_bytes.cmp(&a.size_bytes)
         });
 
-        // Ensure at least one item is marked keep
-        if !items.iter().any(|i| i.is_recommended_keep) && !items.is_empty() {
-            items[0].is_recommended_keep = true;
+        // INVARIANT: Exactly ONE item is marked recommended keep (idx == 0).
+        // ALL other items in the group are marked redundant duplicates (is_recommended_keep = false).
+        for (idx, item) in items.iter_mut().enumerate() {
+            item.is_recommended_keep = idx == 0;
         }
 
-        let recommended_keep_id = items.iter().find(|i| i.is_recommended_keep)
-            .map(|i| i.id.clone())
-            .unwrap_or_default();
-
-        let duplicates_to_remove: Vec<String> = items.iter()
-            .filter(|i| !i.is_recommended_keep)
-            .map(|i| i.id.clone())
-            .collect();
+        let recommended_keep_id = items[0].id.clone();
+        let duplicates_to_remove: Vec<String> = items.iter().skip(1).map(|i| i.id.clone()).collect();
 
         let mod_title = group_titles.get(&family).cloned().unwrap_or_else(|| family.clone());
 
@@ -341,26 +348,40 @@ pub fn remove_duplicate_mod(
                 }
             }
 
-            // Delete dedicated mod directories and files
+            // Delete dedicated mod directories and files (safeguarding shared files/directories)
+            let other_installed = installed_mods.iter().filter(|o| o.id != m.id).collect::<Vec<_>>();
             let dedicated_dirs = crate::installation::get_mod_dedicated_directories(m, root_path);
             for d in dedicated_dirs {
-                if d.is_dir() {
-                    let _ = fs::remove_dir_all(&d);
-                }
-                let dis = PathBuf::from(format!("{}.disabled", d.to_string_lossy().trim_end_matches(".disabled")));
-                if dis.is_dir() {
-                    let _ = fs::remove_dir_all(&dis);
+                let is_dir_shared = other_installed.iter().any(|other| {
+                    other.files.iter().any(|f| {
+                        let f_path = root_path.join(&f.destination_rel_path);
+                        f_path.starts_with(&d)
+                    })
+                });
+                if !is_dir_shared {
+                    if d.is_dir() {
+                        let _ = fs::remove_dir_all(&d);
+                    }
+                    let dis = PathBuf::from(format!("{}.disabled", d.to_string_lossy().trim_end_matches(".disabled")));
+                    if dis.is_dir() {
+                        let _ = fs::remove_dir_all(&dis);
+                    }
                 }
             }
 
             for f in &m.files {
                 let p = root_path.join(&f.destination_rel_path);
-                if p.is_file() {
-                    let _ = fs::remove_file(&p);
-                }
-                let p_dis = PathBuf::from(format!("{}.disabled", p.to_string_lossy().trim_end_matches(".disabled")));
-                if p_dis.is_file() {
-                    let _ = fs::remove_file(&p_dis);
+                let is_file_shared = other_installed.iter().any(|other| {
+                    other.files.iter().any(|of| of.destination_rel_path.eq_ignore_ascii_case(&f.destination_rel_path))
+                });
+                if !is_file_shared {
+                    if p.is_file() {
+                        let _ = fs::remove_file(&p);
+                    }
+                    let p_dis = PathBuf::from(format!("{}.disabled", p.to_string_lossy().trim_end_matches(".disabled")));
+                    if p_dis.is_file() {
+                        let _ = fs::remove_file(&p_dis);
+                    }
                 }
             }
 

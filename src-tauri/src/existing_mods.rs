@@ -625,6 +625,25 @@ pub fn sync_existing_mods_into_db(
         existing_ids.remove("local_ml_essentials");
     }
 
+    // Deduplicate any local_ml_ entries that duplicate catalog mods in the same modloader folder
+    for m in &existing_installed {
+        if m.id.starts_with("local_ml_") {
+            let shares_folder_with_catalog = existing_installed.iter().any(|other| {
+                !other.id.starts_with("local_ml_") && other.id != m.id && other.files.iter().any(|of| {
+                    m.files.iter().any(|mf| {
+                        let mf_clean = mf.destination_rel_path.trim_end_matches(".disabled").replace('\\', "/");
+                        let of_clean = of.destination_rel_path.trim_end_matches(".disabled").replace('\\', "/");
+                        mf_clean.eq_ignore_ascii_case(&of_clean)
+                    })
+                })
+            });
+            if shares_folder_with_catalog {
+                let _ = db.delete_installed_mod(&m.id);
+                existing_ids.remove(&m.id);
+            }
+        }
+    }
+
     // Clean up ghost preinstalled mods whose files and directories no longer exist on disk
     for m in &existing_installed {
         let is_preinstalled = m.source_name.contains("Pre-installed") || m.source_name.contains("Detected");
@@ -666,6 +685,20 @@ pub fn sync_existing_mods_into_db(
                     }
                 }
             }
+            continue;
+        }
+
+        // Avoid creating a duplicate local_ml_ mod if a catalog/managed mod already covers these exact files
+        let is_already_owned_by_catalog = existing_installed.iter().any(|m| {
+            !m.id.starts_with("local_ml_") && m.files.iter().any(|f| {
+                info.relative_files.iter().any(|rf| {
+                    let f_clean = f.destination_rel_path.trim_end_matches(".disabled").replace('\\', "/");
+                    let rf_clean = rf.trim_end_matches(".disabled").replace('\\', "/");
+                    f_clean.eq_ignore_ascii_case(&rf_clean)
+                })
+            })
+        });
+        if is_already_owned_by_catalog {
             continue;
         }
 
