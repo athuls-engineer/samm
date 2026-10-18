@@ -700,13 +700,13 @@ mod tests {
         let one_click_count = all_mods.iter().filter(|m| m.download_url.is_some()).count();
         println!("Total catalog mods: {}, One-click installable mods: {}", all_mods.len(), one_click_count);
         assert!(
-            all_mods.len() >= 500,
-            "Expected at least 500 mods in total catalog, found {}",
+            all_mods.len() >= 600,
+            "Expected at least 600 mods in total catalog, found {}",
             all_mods.len()
         );
         assert!(
-            one_click_count >= 150,
-            "Expected at least 150 1-click installable mods, found {}",
+            one_click_count >= 600,
+            "Expected at least 600 1-click installable mods, found {}",
             one_click_count
         );
     }
