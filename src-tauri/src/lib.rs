@@ -210,6 +210,7 @@ pub fn run() {
             commands::get_duplicate_mods,
             commands::remove_duplicate_mod,
             commands::remove_all_duplicates,
+            commands::get_app_version,
         ])
         .build(tauri::generate_context!()) {
             Ok(a) => {

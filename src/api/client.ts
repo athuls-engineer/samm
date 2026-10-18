@@ -274,4 +274,9 @@ export const api = {
   removeAllDuplicates: async (gameId: string): Promise<DuplicateResolutionResult> => {
     return await invoke('remove_all_duplicates', { gameId });
   },
+
+  getAppVersion: async (): Promise<string> => {
+    return await invoke('get_app_version');
+  },
 };
+

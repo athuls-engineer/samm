@@ -1,5 +1,6 @@
 import React from 'react';
 import { Logo } from './Logo';
+import { getAppVersion } from '../utils/version';
 import {
   Home,
   Compass,
@@ -31,6 +32,7 @@ interface SidebarProps {
   installedCount: number;
   downloadCount: number;
   conflictCount: number;
+  appVersion?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -39,7 +41,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   installedCount,
   downloadCount,
   conflictCount,
+  appVersion,
 }) => {
+  const displayVersion = appVersion || getAppVersion();
   const navItems = [
     { id: 'home' as NavTab, label: 'Overview', icon: Home },
     { id: 'discover' as NavTab, label: 'Discover Mods', icon: Compass },
@@ -62,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="min-w-0">
             <div className="font-bold tracking-tight text-white flex items-center gap-1.5 leading-none">
               <span className="font-mono text-sm tracking-wide text-amber-400 font-extrabold">SAMM</span>
-              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-amber-950/70 text-amber-300 border border-amber-800/60 rounded">v1.0.0</span>
+              <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-amber-950/70 text-amber-300 border border-amber-800/60 rounded">v{displayVersion}</span>
             </div>
             <div className="text-[10px] text-neutral-400 tracking-tight font-medium mt-1 truncate">San Andreas Mod Manager</div>
           </div>

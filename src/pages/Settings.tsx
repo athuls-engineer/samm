@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppSettings, CacheCleanupResult } from '../types';
 import { api } from '../api/client';
+import { getAppVersion } from '../utils/version';
 import {
   Settings as SettingsIcon,
   Save,
@@ -76,7 +77,12 @@ const THEMES: ThemeOption[] = [
   },
 ];
 
-export const Settings: React.FC = () => {
+interface SettingsProps {
+  appVersion?: string;
+}
+
+export const Settings: React.FC<SettingsProps> = ({ appVersion }) => {
+  const displayVersion = appVersion || getAppVersion();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -535,7 +541,7 @@ export const Settings: React.FC = () => {
             </h2>
           </div>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700">
-            Version 1.0.0 (Production Release)
+            Version {displayVersion} (Production Release)
           </span>
         </div>
 

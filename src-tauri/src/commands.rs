@@ -1062,3 +1062,9 @@ pub fn remove_all_duplicates(
 
     crate::duplicates::remove_all_duplicates(&game, &state.db)
 }
+
+#[tauri::command]
+pub fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+

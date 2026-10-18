@@ -13,6 +13,7 @@ import {
   DuplicateModGroup,
 } from './types';
 import { api } from './api/client';
+import { getAppVersion, initAppVersion } from './utils/version';
 import { RotateCcw } from 'lucide-react';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -44,6 +45,7 @@ export const App: React.FC = () => {
   const [backups, setBackups] = useState<BackupRecord[]>([]);
   const [downloadJobs, setDownloadJobs] = useState<DownloadJob[]>([]);
   const [autoInstallStates, setAutoInstallStates] = useState<Record<string, AutoInstallStatus>>({});
+  const [appVersion, setAppVersion] = useState<string>(getAppVersion());
 
   // Modals state
   const [selectedModForDetails, setSelectedModForDetails] = useState<ModRecord | null>(null);
@@ -114,6 +116,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     loadData();
+    initAppVersion().then((v) => setAppVersion(v)).catch(() => {});
   }, []);
 
   // Poll active downloads every 2.5 seconds if any are downloading
@@ -686,6 +689,7 @@ export const App: React.FC = () => {
         installedCount={installedMods.length}
         downloadCount={downloadJobs.filter((j) => j.status === 'downloading').length}
         conflictCount={conflicts.length + duplicates.length}
+        appVersion={appVersion}
       />
 
       {/* Main Content Area */}
@@ -851,7 +855,7 @@ export const App: React.FC = () => {
 
           {currentTab === 'diagnostics' && <Diagnostics />}
 
-          {currentTab === 'settings' && <Settings />}
+          {currentTab === 'settings' && <Settings appVersion={appVersion} />}
         </main>
 
         {/* Professional High-Density Status Bar (MO2 / IDE Style) */}
