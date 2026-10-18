@@ -125,10 +125,35 @@ pub fn run() {
                             if !h_icon_small.is_null() {
                                 SendMessageW(hwnd_ptr, 0x0080 /* WM_SETICON */, 0 /* ICON_SMALL */, h_icon_small as isize);
                             }
+
+                            #[link(name = "user32")]
+                            extern "system" {
+                                fn ShowWindow(hWnd: *mut std::ffi::c_void, nCmdShow: i32) -> i32;
+                                fn SetForegroundWindow(hWnd: *mut std::ffi::c_void) -> i32;
+                                fn BringWindowToTop(hWnd: *mut std::ffi::c_void) -> i32;
+                            }
+                            ShowWindow(hwnd_ptr, 9 /* SW_RESTORE */);
+                            SetForegroundWindow(hwnd_ptr);
+                            BringWindowToTop(hwnd_ptr);
                         }
                     }
                 }
+
+                let _ = window.unminimize();
                 let _ = window.show();
+
+                if let Ok(pos) = window.outer_position() {
+                    if pos.x < -1000 || pos.y < -1000 {
+                        let _ = window.center();
+                    }
+                }
+                if let Ok(size) = window.outer_size() {
+                    if size.width < 300 || size.height < 300 {
+                        let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize { width: 1280.0, height: 840.0 }));
+                        let _ = window.center();
+                    }
+                }
+
                 let _ = window.set_focus();
             }
             Ok(())
