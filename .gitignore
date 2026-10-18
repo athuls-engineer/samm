@@ -4,6 +4,7 @@
 *.pdb
 *.so
 *.dylib
+*.zip
 src-tauri/target/
 **/*.rs.bk
 Cargo.lock
