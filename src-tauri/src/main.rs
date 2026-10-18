@@ -10,51 +10,13 @@ fn sanitize_webview_environment() {
 
     let webview_dir = local_app_data.join("org.samm.modmanager").join("EBWebView");
     let lock_file = webview_dir.join("Default").join("LOCK");
+    let singleton_lock = webview_dir.join("SingletonLock");
 
-    let is_locked = if lock_file.exists() {
-        std::fs::OpenOptions::new().read(true).write(true).open(&lock_file).is_err()
-    } else {
-        false
-    };
-
-    if is_locked {
-        let _ = std::fs::OpenOptions::new().create(true).append(true).open("samm_startup.log").map(|mut f| {
-            use std::io::Write;
-            let _ = writeln!(f, "Detected stale EBWebView lock; terminating orphaned msedgewebview2 processes...");
-        });
-
-        // Terminate orphaned msedgewebview2 processes belonging to SAMM
-        let _ = std::process::Command::new("powershell")
-            .args(&[
-                "-NoProfile",
-                "-NonInteractive",
-                "-WindowStyle", "Hidden",
-                "-Command",
-                "Get-CimInstance Win32_Process -Filter \"Name = 'msedgewebview2.exe'\" | Where-Object { $_.CommandLine -like '*SAMM.exe*' -or $_.CommandLine -like '*org.samm.modmanager*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
-            ])
-            .output();
-
-        std::thread::sleep(std::time::Duration::from_millis(200));
-        let _ = std::fs::remove_file(&lock_file);
-    } else if lock_file.exists() {
+    if lock_file.exists() {
         let _ = std::fs::remove_file(&lock_file);
     }
-
-    // Safety fallback: if the default EBWebView is still locked or inaccessible, use an alternate user data folder
-    let still_locked = if lock_file.exists() {
-        std::fs::OpenOptions::new().read(true).write(true).open(&lock_file).is_err()
-    } else {
-        std::fs::create_dir_all(&webview_dir).is_err()
-    };
-
-    if still_locked {
-        let fallback_dir = local_app_data.join("SAMM").join("EBWebView_SafeSession");
-        let _ = std::fs::create_dir_all(&fallback_dir);
-        std::env::set_var("WEBVIEW2_USER_DATA_FOLDER", &fallback_dir);
-        let _ = std::fs::OpenOptions::new().create(true).append(true).open("samm_startup.log").map(|mut f| {
-            use std::io::Write;
-            let _ = writeln!(f, "Default EBWebView locked; falling back to safe session: {:?}", fallback_dir);
-        });
+    if singleton_lock.exists() {
+        let _ = std::fs::remove_file(&singleton_lock);
     }
 }
 
