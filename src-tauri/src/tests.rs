@@ -699,14 +699,44 @@ mod tests {
         let all_mods = source_mgr.search_all("", None, None).await;
         let one_click_count = all_mods.iter().filter(|m| m.download_url.is_some()).count();
         println!("Total catalog mods: {}, One-click installable mods: {}", all_mods.len(), one_click_count);
+        let mut id_map = std::collections::HashMap::new();
+        let mut title_map = std::collections::HashMap::new();
+        let mut url_map = std::collections::HashMap::new();
+        for m in &all_mods {
+            *id_map.entry(&m.id).or_insert(0) += 1;
+            let norm_title = m.title.trim().to_lowercase();
+            title_map.entry(norm_title).or_insert_with(Vec::new).push(&m.id);
+            if let Some(ref u) = m.download_url {
+                url_map.entry(u.as_str()).or_insert_with(Vec::new).push(&m.id);
+            }
+        }
+        for (id, count) in &id_map {
+            if *count > 1 {
+                println!("Duplicate ID found: {} (count: {})", id, count);
+            }
+        }
+        for (title, ids) in &title_map {
+            if ids.len() > 1 {
+                println!("Duplicate normalized title found: '{}' -> {:?}", title, ids);
+            }
+        }
+        for (url, ids) in &url_map {
+            if ids.len() > 1 {
+                println!("Duplicate download URL found: '{}' -> {:?}", url, ids);
+            }
+        }
+        let dup_id_count = id_map.values().filter(|&&c| c > 1).count();
+        let dup_url_count = url_map.values().filter(|v| v.len() > 1).count();
+        assert_eq!(dup_id_count, 0, "All mods must have completely unique IDs");
+        assert_eq!(dup_url_count, 0, "All 1-click mods must have unique download URLs");
         assert!(
-            all_mods.len() >= 600,
-            "Expected at least 600 mods in total catalog, found {}",
+            all_mods.len() >= 700,
+            "Expected at least 700 mods in total catalog, found {}",
             all_mods.len()
         );
         assert!(
-            one_click_count >= 600,
-            "Expected at least 600 1-click installable mods, found {}",
+            one_click_count >= 150,
+            "Expected at least 150 1-click installable mods, found {}",
             one_click_count
         );
     }

@@ -82,7 +82,69 @@ impl SourceManager {
             }
         }
 
-        results
+        // Deduplicate results to ensure mod uniqueness across catalog and sources
+        Self::deduplicate_mods(results)
+    }
+
+    pub fn deduplicate_mods(mods: Vec<ModRecord>) -> Vec<ModRecord> {
+        let mut unique: Vec<ModRecord> = Vec::new();
+        let mut seen_ids = std::collections::HashSet::new();
+        let mut seen_normalized_titles = std::collections::HashSet::new();
+
+        let mut seen_urls = std::collections::HashSet::new();
+
+        for m in mods {
+            if seen_ids.contains(&m.id) {
+                continue;
+            }
+
+            if let Some(ref url) = m.download_url {
+                if seen_urls.contains(url) {
+                    continue;
+                }
+            }
+
+            let norm_title: String = m
+                .title
+                .to_lowercase()
+                .chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect();
+
+            if !norm_title.is_empty() && seen_normalized_titles.contains(&norm_title) {
+                // If the incoming mod has a 1-click download_url while previous did not, upgrade to 1-click
+                if m.download_url.is_some() {
+                    if let Some(pos) = unique.iter().position(|existing| {
+                        let ex_norm: String = existing
+                            .title
+                            .to_lowercase()
+                            .chars()
+                            .filter(|c| c.is_alphanumeric())
+                            .collect();
+                        ex_norm == norm_title && existing.download_url.is_none()
+                    }) {
+                        seen_ids.remove(&unique[pos].id);
+                        unique[pos] = m.clone();
+                        seen_ids.insert(m.id.clone());
+                        if let Some(ref u) = m.download_url {
+                            seen_urls.insert(u.clone());
+                        }
+                    }
+                }
+                continue;
+            }
+
+            seen_ids.insert(m.id.clone());
+            if let Some(ref u) = m.download_url {
+                seen_urls.insert(u.clone());
+            }
+            if !norm_title.is_empty() {
+                seen_normalized_titles.insert(norm_title);
+            }
+            unique.push(m);
+        }
+
+        unique
     }
 
     pub async fn get_details(&self, source_id: &str, source_mod_id: &str) -> Result<ModRecord, String> {
