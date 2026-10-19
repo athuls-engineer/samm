@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ModRecord, ModSource, InstalledMod, AutoInstallStatus } from '../types';
 import { api } from '../api/client';
 import {
@@ -19,6 +19,9 @@ import {
   Star,
   Flame,
   X,
+  ChevronLeft,
+  ChevronRight,
+  LayoutGrid,
 } from 'lucide-react';
 
 interface DiscoverModsProps {
@@ -47,6 +50,15 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
   const [selectedSource, setSelectedSource] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [filterDirectOnly, setFilterDirectOnly] = useState(false);
+  const [wrapCategories, setWrapCategories] = useState(true);
+  const categoriesRef = useRef<HTMLDivElement>(null);
+
+  const scrollCategories = (offset: number) => {
+    if (categoriesRef.current) {
+      categoriesRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
+
   const [mods, setMods] = useState<ModRecord[]>(() => {
     return modResultsCache.get('All_all_') || modResultsCache.get('Essential & Popular_all_') || [];
   });
@@ -160,44 +172,104 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
 
       {/* Filter and Search Bar */}
       <div className="space-y-3">
-        {/* Category Pills & Quick 1-Click Toggle */}
-        <div className="flex items-center justify-between gap-3 flex-nowrap">
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar flex-1 py-0.5">
+        {/* Category Controls Bar */}
+        <div className="bg-bg-card border border-border p-3 rounded-lg space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle pb-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-neutral-300">
+              <Layers className="w-4 h-4 text-accent" />
+              <span>Catalog Categories ({quickFilterTabs.length})</span>
+              <span className="text-[11px] text-neutral-500 font-normal">
+                {wrapCategories ? 'All visible in grid' : 'Scrollable row'}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Wrap vs Single Row Toggle */}
+              <button
+                onClick={() => setWrapCategories(!wrapCategories)}
+                className={`h-7 px-2.5 rounded border text-[11px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  wrapCategories
+                    ? 'bg-amber-950/50 text-accent border-amber-800/80 shadow-sm'
+                    : 'bg-neutral-800/80 hover:bg-neutral-700 text-neutral-300 border-border'
+                }`}
+                title={wrapCategories ? 'Switch to single scrollable row' : 'Show all categories wrapped in multi-row grid'}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>{wrapCategories ? 'Grid View' : 'Row View'}</span>
+              </button>
+
+              {/* Scroll buttons (active when in row view) */}
+              {!wrapCategories && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => scrollCategories(-240)}
+                    className="h-7 w-7 rounded border border-border bg-neutral-800 hover:bg-neutral-700 text-neutral-200 flex items-center justify-center cursor-pointer transition-colors"
+                    title="Scroll categories left"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => scrollCategories(240)}
+                    className="h-7 w-7 rounded border border-border bg-neutral-800 hover:bg-neutral-700 text-neutral-200 flex items-center justify-center cursor-pointer transition-colors"
+                    title="Scroll categories right"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              <div className="h-4 w-px bg-border mx-0.5" />
+
+              {/* 1-Click Ready Toggle */}
+              <button
+                onClick={() => setFilterDirectOnly(!filterDirectOnly)}
+                className={`h-7 px-2.5 rounded font-bold whitespace-nowrap transition-all text-[11px] flex items-center justify-center gap-1.5 border cursor-pointer ${
+                  filterDirectOnly
+                    ? 'bg-accent text-neutral-950 border-amber-400 shadow-md ring-1 ring-amber-400'
+                    : 'bg-neutral-900 hover:bg-neutral-800 text-accent border-border hover:border-accent/60'
+                }`}
+                title="Show only mods with direct 1-click automated installation"
+              >
+                <Zap className="w-3 h-3 fill-current" />
+                <span>1-Click Ready Only ({directInstallCount})</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Category Pills */}
+          <div
+            ref={categoriesRef}
+            onWheel={(e) => {
+              if (!wrapCategories && e.deltaY !== 0) {
+                e.currentTarget.scrollLeft += e.deltaY;
+              }
+            }}
+            className={`${
+              wrapCategories
+                ? 'flex flex-wrap gap-1.5'
+                : 'flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-0.5'
+            }`}
+          >
             {quickFilterTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setSelectedCategory(tab.id)}
-                className={`h-9 px-3.5 rounded-md font-semibold whitespace-nowrap transition-colors text-xs flex items-center justify-center cursor-pointer flex-shrink-0 ${
+                className={`h-8 px-3 rounded-md font-semibold whitespace-nowrap transition-all text-xs flex items-center justify-center cursor-pointer flex-shrink-0 ${
                   selectedCategory === tab.id
-                    ? 'bg-accent text-bg-main font-bold shadow-sm'
-                    : 'bg-bg-card hover:bg-neutral-800 text-neutral-300 border border-border'
+                    ? 'bg-accent text-neutral-950 font-bold shadow-md ring-1 ring-amber-400/50'
+                    : 'bg-neutral-900/90 hover:bg-neutral-800 hover:text-white text-neutral-300 border border-border/80'
                 }`}
               >
                 {tab.label}
               </button>
             ))}
           </div>
-
-          <div className="h-5 w-px bg-border flex-shrink-0" />
-
-          <button
-            onClick={() => setFilterDirectOnly(!filterDirectOnly)}
-            className={`h-9 px-3.5 rounded-md font-bold whitespace-nowrap transition-all text-xs flex items-center justify-center gap-1.5 border flex-shrink-0 cursor-pointer ${
-              filterDirectOnly
-                ? 'bg-accent text-neutral-950 border-amber-400 shadow-md ring-1 ring-amber-400'
-                : 'bg-bg-card hover:bg-neutral-800 text-accent border-border hover:border-accent/60'
-            }`}
-            title="Show only mods with direct 1-click automated installation"
-          >
-            <Zap className="w-3.5 h-3.5 fill-current" />
-            <span>1-Click Ready Only ({directInstallCount})</span>
-          </button>
         </div>
 
         {/* Inputs row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-bg-card border border-border p-2 rounded-lg">
-          {/* Search box */}
-          <div className="md:col-span-3 relative flex items-center">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-bg-card border border-border p-2 rounded-lg">
+          {/* Search box (6 cols) */}
+          <div className="md:col-span-6 relative flex items-center">
             <Search className="w-4 h-4 text-neutral-400 absolute left-3 pointer-events-none" />
             <input
               type="text"
@@ -208,8 +280,24 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
             />
           </div>
 
-          {/* Source selector */}
-          <div className="relative flex items-center">
+          {/* Category Selector Dropdown (3 cols) */}
+          <div className="md:col-span-3 relative flex items-center">
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full h-9 bg-bg-main border border-border rounded px-3 pr-8 text-xs text-white focus:outline-none focus:border-accent appearance-none cursor-pointer"
+            >
+              {quickFilterTabs.map((tab) => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.label}
+                </option>
+              ))}
+            </select>
+            <Layers className="w-3.5 h-3.5 text-neutral-400 absolute right-3 pointer-events-none" />
+          </div>
+
+          {/* Source selector (3 cols) */}
+          <div className="md:col-span-3 relative flex items-center">
             <select
               value={selectedSource}
               onChange={(e) => setSelectedSource(e.target.value)}
