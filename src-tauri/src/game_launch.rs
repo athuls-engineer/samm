@@ -89,7 +89,8 @@ mod windows_launch {
         let pid = unsafe { GetProcessId(sei.h_process) };
 
         // Check if the process crashed or exited immediately on boot
-        let wait_result = unsafe { WaitForSingleObject(sei.h_process, 600) };
+        // Wait up to 2000ms to verify game engine window creation and D3D device setup
+        let wait_result = unsafe { WaitForSingleObject(sei.h_process, 2000) };
         if wait_result != WAIT_TIMEOUT {
             let mut exit_code: u32 = 0;
             unsafe {
@@ -119,39 +120,23 @@ fn auto_heal_companion_prerequisites(root_dir: &Path) {
         return;
     }
 
-    // 1. Fix CheatMenu customizations.toml if missing
-    let cheatmenu_data = modloader_dir
-        .join("Cheat_Menu_Ultimate_In-Game_Trainer_GUI")
-        .join("CheatMenuSA")
-        .join("data");
-    if cheatmenu_data.is_dir() {
-        let customizations_file = cheatmenu_data.join("customizations.toml");
-        if !customizations_file.exists() {
-            let _ = std::fs::write(&customizations_file, "# CheatMenu customizations\n");
-        }
+    // 1. Isolate CheatMenuSA.asi plugin if present
+    // CheatMenuSA.asi triggers an immediate unhandled exception (0xC0000005) and stack overflow (0xC00000FD)
+    // on modern Windows 11 due to Direct3D9 vtable collisions with radar/HUD hooks.
+    let root_cheat = root_dir.join("CheatMenuSA.asi");
+    if root_cheat.is_file() {
+        let _ = std::fs::rename(&root_cheat, root_dir.join("CheatMenuSA.asi.disabled"));
     }
-
-    // 2. Fix CheatMenuSA folder link in root directory
-    let cheatmenu_src = modloader_dir
+    let ml_cheat = modloader_dir
         .join("Cheat_Menu_Ultimate_In-Game_Trainer_GUI")
-        .join("CheatMenuSA");
-    let cheatmenu_dst = root_dir.join("CheatMenuSA");
-    if cheatmenu_src.is_dir() && !cheatmenu_dst.exists() {
-        #[cfg(target_os = "windows")]
-        {
-            let _ = std::process::Command::new("powershell")
-                .args(&[
-                    "-NoProfile",
-                    "-NonInteractive",
-                    "-Command",
-                    &format!(
-                        "New-Item -ItemType Junction -Path '{}' -Target '{}' -ErrorAction SilentlyContinue",
-                        cheatmenu_dst.to_string_lossy().replace('\'', "''"),
-                        cheatmenu_src.to_string_lossy().replace('\'', "''")
-                    ),
-                ])
-                .output();
-        }
+        .join("CheatMenuSA.asi");
+    if ml_cheat.is_file() {
+        let _ = std::fs::rename(
+            &ml_cheat,
+            modloader_dir
+                .join("Cheat_Menu_Ultimate_In-Game_Trainer_GUI")
+                .join("CheatMenuSA.asi.disabled"),
+        );
     }
 
     // 3. Fix V-HUD folder link in root directory

@@ -999,6 +999,9 @@ mod tests {
         fs::write(game_root.join("vorbisFile.dll"), b"Ultimate-ASI-Loader main").unwrap();
         fs::write(game_root.join("dinput8.dll"), b"Ultimate-ASI-Loader duplicate").unwrap();
 
+        // Write mock CheatMenuSA.asi in modloader
+        fs::write(game_root.join("modloader").join("Cheat_Menu_Ultimate_In-Game_Trainer_GUI").join("CheatMenuSA.asi"), b"mock crash asi").unwrap();
+
         // Run auto-heal
         super::super::game_launch::launch_game(&GameInstallation {
             id: "test_game".to_string(),
@@ -1018,8 +1021,8 @@ mod tests {
             last_verified_date: "".to_string(),
         }, &["-novid".to_string()]).unwrap_err(); // returns err because gta_sa.exe doesn't exist, but auto-heal runs
 
-        // Verify CheatMenu customizations.toml was auto-healed
-        assert!(cheatmenu_data.join("customizations.toml").exists(), "customizations.toml must be generated");
+        // Verify CheatMenuSA.asi was neutralized to prevent fatal crash
+        assert!(game_root.join("modloader").join("Cheat_Menu_Ultimate_In-Game_Trainer_GUI").join("CheatMenuSA.asi.disabled").exists(), "CheatMenuSA.asi must be isolated");
 
         // Verify msvcr100d.dll was copied to game root
         assert!(game_root.join("msvcr100d.dll").exists(), "msvcr100d.dll must be copied to root");
