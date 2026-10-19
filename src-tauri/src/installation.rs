@@ -125,19 +125,44 @@ pub fn generate_installation_plan(
                 }
             }
             InstallationStrategyType::Asi => {
-                if ext == "asi" || ext == "ini" || ext == "dll" || ext == "toml" || ext == "cfg" || ext == "json" || ext == "sp" || ext == "fp" {
+                // If ModLoader is available and the mod contains companion subdirectories (e.g. data/, models/, VHud/), isolate inside ModLoader
+                let has_companion_dirs = resolved_entries.iter().any(|r| r.normalized_subpath.contains('/') || r.normalized_subpath.contains('\\'));
+                if has_modloader && has_companion_dirs {
+                    let clean_rel = if rel_path.to_lowercase().starts_with("modloader/") {
+                        &rel_path["modloader/".len()..]
+                    } else if rel_path.to_lowercase().starts_with("modloader\\") {
+                        &rel_path["modloader\\".len()..]
+                    } else {
+                        rel_path.as_str()
+                    };
+                    (format!("modloader/{}/{}", clean_folder, clean_rel), "Isolate plugin and companion assets inside ModLoader".to_string())
+                } else if ext == "asi" || ext == "ini" || ext == "dll" || ext == "toml" || ext == "cfg" || ext == "json" || ext == "sp" || ext == "fp" {
                     (file_name.to_string(), "Place plugin in game root directory".to_string())
                 } else {
-                    // Keep companion data folders (e.g. CheatMenuSA/fonts, rainbomizer/) alongside the ASI in game root
+                    // Keep companion data folders alongside the ASI in game root
                     (rel_path.clone(), "Place companion plugin asset relative to game root".to_string())
                 }
             }
             InstallationStrategyType::Modloader | InstallationStrategyType::Assets => {
-                (format!("modloader/{}/{}", clean_folder, rel_path), "Isolate package inside ModLoader folder".to_string())
+                let clean_rel = if rel_path.to_lowercase().starts_with("modloader/") {
+                    &rel_path["modloader/".len()..]
+                } else if rel_path.to_lowercase().starts_with("modloader\\") {
+                    &rel_path["modloader\\".len()..]
+                } else {
+                    rel_path.as_str()
+                };
+                (format!("modloader/{}/{}", clean_folder, clean_rel), "Isolate package inside ModLoader folder".to_string())
             }
             _ => {
                 if has_modloader {
-                    (format!("modloader/{}/{}", clean_folder, rel_path), "Sandboxed ModLoader directory".to_string())
+                    let clean_rel = if rel_path.to_lowercase().starts_with("modloader/") {
+                        &rel_path["modloader/".len()..]
+                    } else if rel_path.to_lowercase().starts_with("modloader\\") {
+                        &rel_path["modloader\\".len()..]
+                    } else {
+                        rel_path.as_str()
+                    };
+                    (format!("modloader/{}/{}", clean_folder, clean_rel), "Sandboxed ModLoader directory".to_string())
                 } else {
                     (rel_path.clone(), "Direct placement relative to game root".to_string())
                 }
