@@ -20,10 +20,13 @@ pub fn launch_game(
     let mut cmd = Command::new(exe_path);
     cmd.current_dir(root_dir);
 
-    for arg in custom_args {
-        // Sanitize arguments to avoid command injection
-        if !arg.contains('&') && !arg.contains('|') && !arg.contains(';') {
-            cmd.arg(arg);
+    for arg_entry in custom_args {
+        // Split on whitespace so compound flags and user-entered argument strings are passed as discrete tokens
+        for token in arg_entry.split_whitespace() {
+            // Sanitize arguments to avoid command injection
+            if !token.contains('&') && !token.contains('|') && !token.contains(';') {
+                cmd.arg(token);
+            }
         }
     }
 

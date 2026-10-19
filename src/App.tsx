@@ -743,6 +743,14 @@ export const App: React.FC = () => {
             <Home
               activeGame={activeGame}
               activeProfile={activeProfile}
+              profiles={profiles}
+              onSelectProfile={async (pid) => {
+                if (activeGame) {
+                  await api.setActiveProfile(pid, activeGame.id);
+                  await loadData();
+                  showToast('Active profile switched.');
+                }
+              }}
               installedMods={installedMods}
               conflictsCount={conflicts.length}
               duplicatesCount={duplicates.length}
@@ -751,6 +759,7 @@ export const App: React.FC = () => {
               onNavigate={setCurrentTab}
               onLaunchGame={handleLaunchGame}
               onKillGame={handleKillGame}
+              onRestartGame={handleRestartGame}
               onToast={showToast}
             />
           )}
