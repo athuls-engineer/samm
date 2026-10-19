@@ -25,6 +25,7 @@ import {
   SlidersHorizontal,
   ChevronDown,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 
 interface HomeProps {
@@ -38,7 +39,7 @@ interface HomeProps {
   backupsCount: number;
   isGameRunning?: boolean;
   onNavigate: (tab: any) => void;
-  onLaunchGame: (customArgs: string[]) => void;
+  onLaunchGame: (customArgs: string[]) => Promise<any> | void;
   onKillGame?: () => void;
   onRestartGame?: (customArgs?: string[]) => void;
   onToast?: (text: string, type?: 'success' | 'error') => void;
@@ -134,11 +135,17 @@ export const Home: React.FC<HomeProps> = ({
     return args;
   };
 
-  const handleLaunch = (safeMode = false) => {
+  const handleLaunch = async (safeMode = false) => {
+    if (launching || !activeGame) return;
     setLaunching(true);
     const args = buildArgs(safeMode);
-    onLaunchGame(args);
-    setTimeout(() => setLaunching(false), 2500);
+    try {
+      await onLaunchGame(args);
+    } catch (e: any) {
+      console.warn('Game launch caught in Home:', e);
+    } finally {
+      setTimeout(() => setLaunching(false), 2000);
+    }
   };
 
   const handleSaveDefaults = async () => {
@@ -354,7 +361,7 @@ export const Home: React.FC<HomeProps> = ({
                 <button
                   onClick={() => handleLaunch(true)}
                   disabled={!activeGame || launching}
-                  className="h-9 px-3.5 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-xs font-semibold text-neutral-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="h-9 px-3.5 rounded bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-xs font-semibold text-neutral-300 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Launch with -safemode flag to bypass high-res asset hooks if crashed"
                 >
                   <Shield className="w-3.5 h-3.5 text-neutral-400" />
@@ -370,8 +377,17 @@ export const Home: React.FC<HomeProps> = ({
                       : 'bg-neutral-800 text-neutral-500 cursor-not-allowed border border-neutral-700'
                   }`}
                 >
-                  <Play className="w-4 h-4 fill-current" />
-                  <span>{launching ? 'Starting Process...' : 'Launch GTA: San Andreas'}</span>
+                  {launching ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                      <span>Starting Process...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>Launch GTA: San Andreas</span>
+                    </>
+                  )}
                 </button>
               </>
             )}

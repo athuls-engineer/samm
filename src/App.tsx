@@ -286,14 +286,25 @@ export const App: React.FC = () => {
     }
   };
 
+  const [isLaunchingGame, setIsLaunchingGame] = useState(false);
+
   const handleLaunchGame = async (customArgs: string[] = []) => {
-    if (!activeGame) return;
+    if (!activeGame) {
+      showToast('Please select or locate your GTA: San Andreas installation folder first.', 'error');
+      return;
+    }
+    setIsLaunchingGame(true);
     try {
+      showToast('Launching GTA: San Andreas...');
       const pid = await api.launchGame(activeGame.id, customArgs);
       setIsGameRunning(true);
-      showToast(`GTA: San Andreas launched successfully (PID: ${pid})`);
+      showToast(`GTA: San Andreas launched successfully (PID: ${pid})`, 'success');
     } catch (e: any) {
-      showToast(`Launch failed: ${e?.toString()}`, 'error');
+      const msg = typeof e === 'string' ? e : e?.message || e?.toString() || 'Unknown launch failure';
+      showToast(`Launch failed: ${msg}`, 'error');
+      throw e;
+    } finally {
+      setTimeout(() => setIsLaunchingGame(false), 2000);
     }
   };
 
@@ -698,6 +709,7 @@ export const App: React.FC = () => {
           activeGame={activeGame}
           activeProfile={activeProfile}
           isGameRunning={isGameRunning}
+          isLaunching={isLaunchingGame}
           onLaunchGame={() => handleLaunchGame(['-novid'])}
           onKillGame={handleKillGame}
           onRestartGame={() => handleRestartGame(['-novid'])}

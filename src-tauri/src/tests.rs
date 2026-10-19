@@ -973,5 +973,63 @@ mod tests {
         let after = crate::duplicates::scan_all_duplicates(&game, &db);
         assert_eq!(after.len(), 0, "Zero duplicates remain after cleanup");
     }
+
+    #[test]
+    fn test_launch_game_pre_checks_and_auto_heal() {
+        use std::fs;
+        let temp_dir = tempfile::tempdir().unwrap();
+        let game_root = temp_dir.path();
+
+        // Set up mock modloader directory structure
+        let cheatmenu_data = game_root.join("modloader").join("Cheat_Menu_Ultimate_In-Game_Trainer_GUI").join("CheatMenuSA").join("data");
+        fs::create_dir_all(&cheatmenu_data).unwrap();
+
+        let fp_dir = game_root.join("modloader").join("First_Person_Mod_v3_0_FIXED");
+        fs::create_dir_all(&fp_dir).unwrap();
+        fs::write(fp_dir.join("msvcr100d.dll"), b"debug runtime").unwrap();
+
+        let vhud_dir = game_root.join("modloader").join("GTA_V_Style_High-Definition_Radar__Minimap");
+        fs::create_dir_all(&vhud_dir).unwrap();
+        fs::write(vhud_dir.join("bass.dll"), vec![0u8; 129_828]).unwrap();
+
+        // Write ancient 92KB bass.dll in root
+        fs::write(game_root.join("bass.dll"), vec![0u8; 92_216]).unwrap();
+
+        // Write duplicate Ultimate ASI Loader dinput8.dll
+        fs::write(game_root.join("vorbisFile.dll"), b"Ultimate-ASI-Loader main").unwrap();
+        fs::write(game_root.join("dinput8.dll"), b"Ultimate-ASI-Loader duplicate").unwrap();
+
+        // Run auto-heal
+        super::super::game_launch::launch_game(&GameInstallation {
+            id: "test_game".to_string(),
+            name: "GTA San Andreas".to_string(),
+            executable_path: game_root.join("gta_sa.exe").to_string_lossy().to_string(),
+            root_path: game_root.to_string_lossy().to_string(),
+            detected_edition: "1.0".to_string(),
+            version_confidence: ConfidenceLevel::Confirmed,
+            executable_sha256: "".to_string(),
+            executable_size_bytes: 0,
+            pe_timestamp: None,
+            evidence_list: Vec::new(),
+            uncertainties: Vec::new(),
+            is_classic_1_0: true,
+            is_active: true,
+            created_date: "".to_string(),
+            last_verified_date: "".to_string(),
+        }, &["-novid".to_string()]).unwrap_err(); // returns err because gta_sa.exe doesn't exist, but auto-heal runs
+
+        // Verify CheatMenu customizations.toml was auto-healed
+        assert!(cheatmenu_data.join("customizations.toml").exists(), "customizations.toml must be generated");
+
+        // Verify msvcr100d.dll was copied to game root
+        assert!(game_root.join("msvcr100d.dll").exists(), "msvcr100d.dll must be copied to root");
+
+        // Verify bass.dll was upgraded in game root
+        assert_eq!(fs::metadata(game_root.join("bass.dll")).unwrap().len(), 129_828, "bass.dll must be upgraded to 129KB");
+
+        // Verify duplicate dinput8.dll was renamed
+        assert!(!game_root.join("dinput8.dll").exists(), "Duplicate dinput8.dll must be removed from active load path");
+        assert!(game_root.join("dinput8.dll.duplicate_bak").exists(), "Duplicate dinput8.dll must be backed up");
+    }
 }
 

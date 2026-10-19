@@ -10,12 +10,14 @@ import {
   FolderOpen,
   Square,
   RotateCcw,
+  Loader2,
 } from 'lucide-react';
 
 interface HeaderProps {
   activeGame: GameInstallation | null;
   activeProfile: Profile | null;
   isGameRunning?: boolean;
+  isLaunching?: boolean;
   onLaunchGame: () => void;
   onKillGame?: () => void;
   onRestartGame?: () => void;
@@ -28,6 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeGame,
   activeProfile,
   isGameRunning = false,
+  isLaunching = false,
   onLaunchGame,
   onKillGame,
   onRestartGame,
@@ -173,15 +176,24 @@ export const Header: React.FC<HeaderProps> = ({
         ) : (
           <button
             onClick={onLaunchGame}
-            disabled={!activeGame}
+            disabled={!activeGame || isLaunching}
             className={`h-9 px-4 rounded-md text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5 ${
-              activeGame
+              activeGame && !isLaunching
                 ? 'bg-accent hover:bg-accent-hover text-bg-main active:scale-[0.98] cursor-pointer'
                 : 'bg-neutral-800 text-neutral-500 cursor-not-allowed border border-neutral-700'
             }`}
           >
-            <Play className="w-3.5 h-3.5 fill-current" />
-            <span>Launch Game</span>
+            {isLaunching ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-accent" />
+                <span>Launching...</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Launch Game</span>
+              </>
+            )}
           </button>
         )}
       </div>
