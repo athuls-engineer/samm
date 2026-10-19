@@ -735,8 +735,8 @@ mod tests {
             all_mods.len()
         );
         assert!(
-            one_click_count >= 150,
-            "Expected at least 150 1-click installable mods, found {}",
+            one_click_count >= 700,
+            "Expected at least 700 1-click installable mods, found {}",
             one_click_count
         );
     }

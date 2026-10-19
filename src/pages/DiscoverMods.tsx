@@ -45,10 +45,10 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
 }) => {
   const [query, setQuery] = useState('');
   const [selectedSource, setSelectedSource] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('Essential & Popular');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [filterDirectOnly, setFilterDirectOnly] = useState(false);
   const [mods, setMods] = useState<ModRecord[]>(() => {
-    return modResultsCache.get('Essential & Popular_all_') || modResultsCache.get('All_all_') || [];
+    return modResultsCache.get('All_all_') || modResultsCache.get('Essential & Popular_all_') || [];
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,9 +90,9 @@ export const DiscoverMods: React.FC<DiscoverModsProps> = ({
   }, [query, selectedSource, selectedCategory]);
 
   const quickFilterTabs = [
+    { id: 'All', label: 'All Mods' },
     { id: 'Essential & Popular', label: 'Essential & Popular' },
     { id: 'Goofy & Memes', label: 'Goofy & Memes' },
-    { id: 'All', label: 'All Mods' },
     { id: 'Plugins / ASI', label: 'ASI & Engine Fixes' },
     { id: 'Total Conversions', label: 'Total Conversions & Maps' },
     { id: 'Graphics / Plugins', label: 'Graphics, Shaders & Lighting' },
