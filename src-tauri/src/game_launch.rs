@@ -88,17 +88,17 @@ mod windows_launch {
 
         let pid = unsafe { GetProcessId(sei.h_process) };
 
-        // Check if the process crashed immediately on boot
-        let wait_result = unsafe { WaitForSingleObject(sei.h_process, 500) };
+        // Check if the process crashed or exited immediately on boot
+        let wait_result = unsafe { WaitForSingleObject(sei.h_process, 600) };
         if wait_result != WAIT_TIMEOUT {
             let mut exit_code: u32 = 0;
             unsafe {
                 GetExitCodeProcess(sei.h_process, &mut exit_code);
                 CloseHandle(sei.h_process);
             }
-            if exit_code != 0 && exit_code != STILL_ACTIVE {
+            if exit_code != STILL_ACTIVE {
                 return Err(format!(
-                    "Game process terminated immediately upon launch (exit code: 0x{:X}). This may indicate a mod collision, missing companion DLL, or invalid resolution setting.",
+                    "Game process terminated immediately upon launch (exit code: 0x{:X}). If the game closed silently, your 'gta_sa.set' configuration may be corrupted or an incompatible DLL hooked the process.",
                     exit_code
                 ));
             }
@@ -131,7 +131,30 @@ fn auto_heal_companion_prerequisites(root_dir: &Path) {
         }
     }
 
-    // 2. Fix V-HUD folder link in root directory
+    // 2. Fix CheatMenuSA folder link in root directory
+    let cheatmenu_src = modloader_dir
+        .join("Cheat_Menu_Ultimate_In-Game_Trainer_GUI")
+        .join("CheatMenuSA");
+    let cheatmenu_dst = root_dir.join("CheatMenuSA");
+    if cheatmenu_src.is_dir() && !cheatmenu_dst.exists() {
+        #[cfg(target_os = "windows")]
+        {
+            let _ = std::process::Command::new("powershell")
+                .args(&[
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    &format!(
+                        "New-Item -ItemType Junction -Path '{}' -Target '{}' -ErrorAction SilentlyContinue",
+                        cheatmenu_dst.to_string_lossy().replace('\'', "''"),
+                        cheatmenu_src.to_string_lossy().replace('\'', "''")
+                    ),
+                ])
+                .output();
+        }
+    }
+
+    // 3. Fix V-HUD folder link in root directory
     let vhud_src = modloader_dir
         .join("GTA_V_Style_High-Definition_Radar__Minimap")
         .join("VHud");
@@ -154,7 +177,7 @@ fn auto_heal_companion_prerequisites(root_dir: &Path) {
         }
     }
 
-    // 3. Fix bass.dll in game root if older or missing
+    // 4. Fix bass.dll in game root if older or missing
     let vhud_bass = modloader_dir
         .join("GTA_V_Style_High-Definition_Radar__Minimap")
         .join("bass.dll");
@@ -170,7 +193,7 @@ fn auto_heal_companion_prerequisites(root_dir: &Path) {
         }
     }
 
-    // 4. Fix msvcr100d.dll runtime in game root if companion needs it
+    // 5. Fix msvcr100d.dll runtime in game root if companion needs it
     let fp_msvcr = modloader_dir
         .join("First_Person_Mod_v3_0_FIXED")
         .join("msvcr100d.dll");
@@ -179,7 +202,7 @@ fn auto_heal_companion_prerequisites(root_dir: &Path) {
         let _ = std::fs::copy(&fp_msvcr, &root_msvcr);
     }
 
-    // 5. Detect and resolve duplicate ASI loaders in game root
+    // 6. Detect and resolve duplicate ASI loaders in game root
     let dinput8 = root_dir.join("dinput8.dll");
     let vorbis = root_dir.join("vorbisFile.dll");
     if dinput8.is_file() && vorbis.is_file() {
@@ -189,6 +212,18 @@ fn auto_heal_companion_prerequisites(root_dir: &Path) {
             if content_str.contains("Ultimate-ASI-Loader") || content_str.contains("Ultimate ASI Loader") {
                 let backup_path = root_dir.join("dinput8.dll.duplicate_bak");
                 let _ = std::fs::rename(&dinput8, &backup_path);
+            }
+        }
+    }
+
+    // 7. Detect and isolate third-party SA-MP hooks that intercept and abort singleplayer
+    let winmm = root_dir.join("winmm.dll");
+    if winmm.is_file() {
+        if let Ok(content) = std::fs::read(&winmm) {
+            let content_str = String::from_utf8_lossy(&content);
+            if content_str.contains("sa-mp") || content_str.contains("samp") || content_str.contains("masterlist") {
+                let backup_path = root_dir.join("winmm.dll.samp_bak");
+                let _ = std::fs::rename(&winmm, &backup_path);
             }
         }
     }
@@ -246,11 +281,21 @@ pub fn launch_game(
         match windows_launch::launch_via_shell(exe_path, root_dir, &args_str) {
             Ok(pid) => return Ok(pid),
             Err(e) => {
-                // If shell launch returned a crash error, propagate it
+                // If the game closed immediately, auto-recover corrupted gta_sa.set
+                if let Some(doc_dir) = dirs::document_dir() {
+                    let set_file = doc_dir.join("GTA San Andreas User Files").join("gta_sa.set");
+                    if set_file.is_file() {
+                        let bak_file = doc_dir.join("GTA San Andreas User Files").join("gta_sa.set.corrupt_bak");
+                        let _ = std::fs::rename(&set_file, &bak_file);
+                        std::thread::sleep(std::time::Duration::from_millis(200));
+                        if let Ok(pid) = windows_launch::launch_via_shell(exe_path, root_dir, &args_str) {
+                            return Ok(pid);
+                        }
+                    }
+                }
                 if e.contains("terminated immediately") {
                     return Err(e);
                 }
-                // Otherwise fall through to Command::new fallback
             }
         }
     }
