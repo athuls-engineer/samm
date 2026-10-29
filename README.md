@@ -141,3 +141,10 @@ src-tauri/target/release/samm.exe
 This project is licensed under the [MIT License](LICENSE).
 
 Developed and maintained by [Athul S](https://github.com/athuls-engineer).
+
+---
+
+## 🤝 Authors & Contributors
+
+* **Athul S** ([@athuls-engineer](https://github.com/athuls-engineer)) — Creator & Lead Systems Developer
+* **Google Gemini** (AI Pair Programmer) — Co-developer assisting with Rust backend architecture, Tauri IPC commands, conflict resolution algorithms, and test suite design.
