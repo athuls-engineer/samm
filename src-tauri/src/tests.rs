@@ -1034,5 +1034,60 @@ mod tests {
         assert!(!game_root.join("dinput8.dll").exists(), "Duplicate dinput8.dll must be removed from active load path");
         assert!(game_root.join("dinput8.dll.duplicate_bak").exists(), "Duplicate dinput8.dll must be backed up");
     }
+
+    #[test]
+    fn test_display_engine_configuration_and_oversized_loadscs_neutralization() {
+        use std::fs;
+        let temp_dir = tempfile::tempdir().unwrap();
+        let game_root = temp_dir.path().join("GTA_San_Andreas");
+        fs::create_dir_all(&game_root).unwrap();
+
+        let scripts_dir = game_root.join("scripts");
+        fs::create_dir_all(&scripts_dir).unwrap();
+
+        let modloader_dir = game_root.join("modloader");
+        fs::create_dir_all(&modloader_dir).unwrap();
+
+        // Create mock modloader.ini
+        fs::write(modloader_dir.join("modloader.ini"), "[Folder.Config]\nProfile = Default\n\n[Profiles.Default.IgnoreMods]\n_ignore\n").unwrap();
+
+        // Create mock oversized LOADSCS.txd (11MB)
+        let hd_gui_dir = modloader_dir.join("HD_GUI").join("models").join("txd");
+        fs::create_dir_all(&hd_gui_dir).unwrap();
+        let big_file = hd_gui_dir.join("LOADSCS.txd");
+        let f = fs::File::create(&big_file).unwrap();
+        f.set_len(11 * 1024 * 1024).unwrap();
+
+        // 1. Test Fullscreen Borderless Mode at 1080p
+        super::super::game_launch::configure_widescreen_and_display(&game_root, 1920, 1080, false);
+
+        // Check WidescreenFix ini
+        let ws_ini = fs::read_to_string(scripts_dir.join("GTASA.WidescreenFix.ini")).unwrap();
+        assert!(ws_ini.contains("ResX = 1920"));
+        assert!(ws_ini.contains("ResY = 1080"));
+        assert!(ws_ini.contains("FrontendAspectRatio = auto"));
+        assert!(ws_ini.contains("AllowAltTabbingWithoutPausing = 1"));
+
+        // Check WindowedMode ini: ShowBorder = 0 provides borderless fullscreen
+        let wm_ini = fs::read_to_string(scripts_dir.join("III.VC.SA.WindowedMode.ini")).unwrap();
+        assert!(wm_ini.contains("ShowBorder = 0"));
+
+        // Check dxvk.conf
+        let dxvk = fs::read_to_string(game_root.join("dxvk.conf")).unwrap();
+        assert!(dxvk.contains("dxvk.allowFse = False"));
+
+        // Check modloader.ini ignore rules
+        let ml_ini = fs::read_to_string(modloader_dir.join("modloader.ini")).unwrap();
+        assert!(ml_ini.contains("*.disabled"));
+
+        // Check oversized LOADSCS was renamed
+        assert!(!big_file.exists());
+        assert!(hd_gui_dir.join("LOADSCS.txd.disabled").exists());
+
+        // 2. Test Windowed Mode
+        super::super::game_launch::configure_widescreen_and_display(&game_root, 1280, 720, true);
+        let wm_ini_windowed = fs::read_to_string(scripts_dir.join("III.VC.SA.WindowedMode.ini")).unwrap();
+        assert!(wm_ini_windowed.contains("ShowBorder = 1"));
+    }
 }
 

@@ -48,3 +48,6 @@ repo_assets.json
 search_repos.json
 verified_*.json
 generated_catalog_code.rs
+
+# Dev and runtime artifacts
+*.lnk

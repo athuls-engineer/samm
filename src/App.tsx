@@ -296,7 +296,16 @@ export const App: React.FC = () => {
     setIsLaunchingGame(true);
     try {
       showToast('Launching GTA: San Andreas...');
-      const pid = await api.launchGame(activeGame.id, customArgs);
+      let launchArgs = customArgs;
+      if (launchArgs.length === 0 || (launchArgs.length === 1 && launchArgs[0] === '-novid')) {
+        try {
+          const s = await api.getSettings();
+          if (s?.defaultLaunchArgs?.trim()) {
+            launchArgs = s.defaultLaunchArgs.trim().split(/\s+/).filter(Boolean);
+          }
+        } catch {}
+      }
+      const pid = await api.launchGame(activeGame.id, launchArgs);
       setIsGameRunning(true);
       showToast(`GTA: San Andreas launched successfully (PID: ${pid})`, 'success');
     } catch (e: any) {
@@ -316,7 +325,16 @@ export const App: React.FC = () => {
       setIsGameRunning(false);
       // Brief pause to allow OS file handles and memory to release cleanly
       await new Promise((r) => setTimeout(r, 600));
-      const pid = await api.launchGame(activeGame.id, customArgs);
+      let launchArgs = customArgs;
+      if (launchArgs.length === 0 || (launchArgs.length === 1 && launchArgs[0] === '-novid')) {
+        try {
+          const s = await api.getSettings();
+          if (s?.defaultLaunchArgs?.trim()) {
+            launchArgs = s.defaultLaunchArgs.trim().split(/\s+/).filter(Boolean);
+          }
+        } catch {}
+      }
+      const pid = await api.launchGame(activeGame.id, launchArgs);
       setIsGameRunning(true);
       showToast(`GTA: San Andreas restarted successfully (PID: ${pid})`);
     } catch (e: any) {

@@ -120,24 +120,46 @@ fn auto_heal_companion_prerequisites(root_dir: &Path) {
         return;
     }
 
-    // 1. Isolate CheatMenuSA.asi plugin if present
-    // CheatMenuSA.asi triggers an immediate unhandled exception (0xC0000005) and stack overflow (0xC00000FD)
-    // on modern Windows 11 due to Direct3D9 vtable collisions with radar/HUD hooks.
+    // 1. Isolate Cheat Menu mod entirely
+    // CheatMenuSA.asi triggers D3D9 vtable collisions, and its internal CheatMenuSA/clothes.txd and vehicles.txd
+    // intercept ModLoader's streaming and replace vanilla clothing/vehicles with thumbnail icons,
+    // which triggers an immediate 0x007F39FB crash in RwTexDictionaryFindNamedTexture during character init.
     let root_cheat = root_dir.join("CheatMenuSA.asi");
     if root_cheat.is_file() {
         let _ = std::fs::rename(&root_cheat, root_dir.join("CheatMenuSA.asi.disabled"));
     }
-    let ml_cheat = modloader_dir
-        .join("Cheat_Menu_Ultimate_In-Game_Trainer_GUI")
-        .join("CheatMenuSA.asi");
-    if ml_cheat.is_file() {
-        let _ = std::fs::rename(
-            &ml_cheat,
-            modloader_dir
-                .join("Cheat_Menu_Ultimate_In-Game_Trainer_GUI")
-                .join("CheatMenuSA.asi.disabled"),
-        );
+    let ml_cheat_dir = modloader_dir.join("Cheat_Menu_Ultimate_In-Game_Trainer_GUI");
+    if ml_cheat_dir.is_dir() {
+        let ml_asi = ml_cheat_dir.join("CheatMenuSA.asi");
+        if ml_asi.is_file() {
+            let _ = std::fs::rename(&ml_asi, ml_cheat_dir.join("CheatMenuSA.asi.disabled"));
+        }
     }
+
+    // 2. Scan and neutralize any rogue clothes.txd or hud.txd in modloader that replace core game assets
+    fn sanitize_rogue_txds(dir: &Path) {
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    let folder_name = p.file_name().unwrap_or_default().to_string_lossy().to_string();
+                    if !folder_name.ends_with(".disabled") {
+                        sanitize_rogue_txds(&p);
+                    }
+                } else if p.is_file() {
+                    let file_name = p.file_name().unwrap_or_default().to_string_lossy().to_lowercase();
+                    if file_name == "clothes.txd" {
+                        let path_str = p.to_string_lossy().to_lowercase();
+                        if path_str.contains("cheat") || path_str.contains("menu") || path_str.contains("trainer") {
+                            let disabled_p = p.with_file_name(format!("{}.disabled", p.file_name().unwrap_or_default().to_string_lossy()));
+                            let _ = std::fs::rename(&p, &disabled_p);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    sanitize_rogue_txds(&modloader_dir);
 
     // 3. Fix V-HUD folder link in root directory
     let vhud_src = modloader_dir
@@ -212,6 +234,328 @@ fn auto_heal_companion_prerequisites(root_dir: &Path) {
             }
         }
     }
+
+    // 8. Disable legacy DirectShow intro movies on Windows 11 to avoid video focus abort
+    let movies_dir = root_dir.join("movies");
+    if movies_dir.is_dir() {
+        for movie_name in &["Logo.mpg", "GTAtitles.mpg"] {
+            let movie_file = movies_dir.join(movie_name);
+            if movie_file.is_file() {
+                let disabled_file = movies_dir.join(format!("{}.disabled", movie_name));
+                let _ = std::fs::rename(&movie_file, &disabled_file);
+            }
+        }
+    }
+
+    // 9. Centrally manage essentials in scripts/ and neutralize duplicates in root and modloader
+    // SilentPatch, WidescreenFix, WindowedMode, and FramerateVigilante MUST load early via scripts/
+    // so they hook Direct3D9 device creation before ModLoader initializes.
+    let scripts_dir = root_dir.join("scripts");
+    let essentials_dir = modloader_dir.join("_ESSENTIALS");
+    let _ = std::fs::create_dir_all(&scripts_dir);
+
+    let essential_names = [
+        "SilentPatchSA.asi",
+        "GTASA.WidescreenFix.asi",
+        "III.VC.SA.WindowedMode.asi",
+        "FramerateVigilante.SA.asi",
+    ];
+
+    for asi_name in &essential_names {
+        let script_target = scripts_dir.join(asi_name);
+        if !script_target.is_file() {
+            // Restore from duplicate_bak or modloader
+            let candidates = [
+                scripts_dir.join(format!("{}.duplicate_bak", asi_name)),
+                scripts_dir.join(format!("{}.disabled", asi_name)),
+                root_dir.join(asi_name),
+                root_dir.join(format!("{}.duplicate_bak", asi_name)),
+            ];
+            for cand in &candidates {
+                if cand.is_file() {
+                    let _ = std::fs::copy(cand, &script_target);
+                    break;
+                }
+            }
+        }
+
+        // Neutralize root copy so only scripts/ loads it
+        let root_copy = root_dir.join(asi_name);
+        if root_copy.is_file() {
+            let backup_path = root_dir.join(format!("{}.duplicate_bak", asi_name));
+            let _ = std::fs::rename(&root_copy, &backup_path);
+        }
+    }
+
+    // Disable duplicate essential ASIs inside modloader/_ESSENTIALS so ModLoader doesn't load them twice
+    if essentials_dir.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(&essentials_dir) {
+            for entry in entries.flatten() {
+                let sub_path = entry.path();
+                if sub_path.is_dir() {
+                    if let Ok(sub_entries) = std::fs::read_dir(&sub_path) {
+                        for se in sub_entries.flatten() {
+                            let p = se.path();
+                            if p.is_file() {
+                                if let Some(ext) = p.extension() {
+                                    if ext.eq_ignore_ascii_case("asi") {
+                                        let disabled_path = p.with_file_name(format!("{}.disabled", p.file_name().unwrap_or_default().to_string_lossy()));
+                                        let _ = std::fs::rename(&p, &disabled_path);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 10. Auto-repair Skimmer vehicle definition in data/vehicles.ide (Windows 11 24H2 crash fix)
+    let vehicles_ide = root_dir.join("data").join("vehicles.ide");
+    if vehicles_ide.is_file() {
+        if let Ok(content) = std::fs::read_to_string(&vehicles_ide) {
+            if content.contains("460, \tskimmer,\tskimmer, \tplane,\t\tSEAPLANE,\tSKIMMER,\tnull,\tignore,\t\t5,\t0,\t0\r\n")
+                || content.contains("460, \tskimmer,\tskimmer, \tplane,\t\tSEAPLANE,\tSKIMMER,\tnull,\tignore,\t\t5,\t0,\t0\n")
+            {
+                let repaired = content.replace(
+                    "460, \tskimmer,\tskimmer, \tplane,\t\tSEAPLANE,\tSKIMMER,\tnull,\tignore,\t\t5,\t0,\t0",
+                    "460, \tskimmer,\tskimmer, \tplane,\t\tSEAPLANE,\tSKIMMER,\tnull,\tignore,\t\t5,\t0,\t0,\t\t-1, 0.7, 0.7,\t\t-1",
+                );
+                let _ = std::fs::write(&vehicles_ide, repaired);
+            }
+        }
+    }
+
+    // 11. Ensure Windows 11 DPI awareness manifest and AppCompat flags
+    let manifest_path = root_dir.join("gta_sa.exe.manifest");
+    if !manifest_path.is_file() {
+        let manifest_content = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2,PerMonitor</dpiAwareness>
+    </windowsSettings>
+  </application>
+</assembly>"#;
+        let _ = std::fs::write(&manifest_path, manifest_content);
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let exe_path = root_dir.join("gta_sa.exe");
+        let exe_path_str = exe_path.to_string_lossy().to_string();
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        let _ = std::process::Command::new("powershell")
+            .args(&[
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                &format!(
+                    "Set-ItemProperty -Path 'HKCU:\\Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers' -Name '{}' -Value '~ HIGHDPIAWARE $ IgnoreFreeLibrary<vhud>' -ErrorAction SilentlyContinue",
+                    exe_path_str.replace('\'', "''")
+                ),
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output();
+    }
+
+    // 12. Quarantine SkyGfx and Project 2DFX to eliminate black shader anomalies on Intel UHD / DXVK
+    let skygfx_dir = modloader_dir.join("SkyGfx_42b_PS2__Xbox_Graphical_Pipelines");
+    if skygfx_dir.is_dir() {
+        let _ = std::fs::rename(&skygfx_dir, modloader_dir.join("SkyGfx_42b_PS2__Xbox_Graphical_Pipelines.disabled"));
+    }
+    let p2dfx_dir = modloader_dir.join("Project_2DFX_Max_Draw_Distance__LODs");
+    if p2dfx_dir.is_dir() {
+        let _ = std::fs::rename(&p2dfx_dir, modloader_dir.join("Project_2DFX_Max_Draw_Distance__LODs.disabled"));
+    }
+
+    // 13. Ensure VHud.asi is disabled to prevent d3dx9_43 shader compiler access violations with DXVK
+    let vhud_asi = modloader_dir
+        .join("GTA_V_Style_High-Definition_Radar__Minimap")
+        .join("VHud.asi");
+    if vhud_asi.is_file() {
+        let _ = std::fs::rename(&vhud_asi, modloader_dir.join("GTA_V_Style_High-Definition_Radar__Minimap").join("VHud.asi.disabled"));
+    }
+
+    // 14. Ensure DXVK configuration for Intel UHD / modern Windows display adapter compatibility
+    // ModeCountCompatibility must NEVER be true: it truncates reported display modes to 16, dropping 1920x1080!
+    let dxvk_conf = root_dir.join("dxvk.conf");
+    let dxvk_required = "d3d9.forceAspectRatio = 16:9\ndxvk.allowFse = False\n";
+    let _ = std::fs::write(&dxvk_conf, dxvk_required);
+
+    // 15. Quarantine First Person Mod to prevent cutscene camera entrapment and black interiors
+    let fp_dir = modloader_dir.join("First_Person_Mod_v3_0_FIXED");
+    if fp_dir.is_dir() {
+        let _ = std::fs::rename(&fp_dir, modloader_dir.join("First_Person_Mod_v3_0_FIXED.disabled"));
+    }
+}
+
+fn update_or_append_ini_key(content: &mut String, key: &str, value: &str) {
+    let prefix = format!("{} =", key);
+    let prefix_space = format!("{}=", key);
+    let mut replaced = false;
+    let mut new_lines = Vec::new();
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with(&prefix) || trimmed.starts_with(&prefix_space) {
+            new_lines.push(format!("{} = {}", key, value));
+            replaced = true;
+        } else {
+            new_lines.push(line.to_string());
+        }
+    }
+    if !replaced {
+        if !new_lines.iter().any(|l| l.trim().starts_with("[MAIN]") || l.trim().starts_with("[")) {
+            new_lines.insert(0, "[MAIN]".to_string());
+        }
+        new_lines.push(format!("{} = {}", key, value));
+    }
+    *content = new_lines.join("\r\n");
+}
+
+fn scan_and_disable_oversized_loadscs(dir: &Path) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                scan_and_disable_oversized_loadscs(&path);
+            } else if path.is_file() {
+                let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+                if file_name.eq_ignore_ascii_case("LOADSCS.txd") {
+                    if let Ok(meta) = path.metadata() {
+                        if meta.len() > 10_000_000 {
+                            let disabled_path = path.with_file_name(format!("{}.disabled", file_name));
+                            let _ = std::fs::rename(&path, &disabled_path);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn configure_widescreen_and_display(root_dir: &Path, width: u32, height: u32, windowed: bool) {
+    let scripts_dir = root_dir.join("scripts");
+    let modloader_dir = root_dir.join("modloader");
+    let _ = std::fs::create_dir_all(&scripts_dir);
+
+    // 1. Ensure scripts/GTASA.WidescreenFix.asi is active
+    let script_ws_asi = scripts_dir.join("GTASA.WidescreenFix.asi");
+    if !script_ws_asi.is_file() {
+        let candidates = [
+            scripts_dir.join("GTASA.WidescreenFix.asi.duplicate_bak"),
+            root_dir.join("GTASA.WidescreenFix.asi"),
+            root_dir.join("GTASA.WidescreenFix.asi.duplicate_bak"),
+            modloader_dir.join("_ESSENTIALS").join("Widescreen Fix by ThirteenAG").join("GTASA.WidescreenFix.asi"),
+            modloader_dir.join("_ESSENTIALS").join("Widescreen Fix by ThirteenAG").join("GTASA.WidescreenFix.asi.disabled"),
+        ];
+        for cand in &candidates {
+            if cand.is_file() {
+                let _ = std::fs::copy(cand, &script_ws_asi);
+                break;
+            }
+        }
+    }
+
+    // 2. Ensure scripts/III.VC.SA.WindowedMode.asi is active
+    let script_wm_asi = scripts_dir.join("III.VC.SA.WindowedMode.asi");
+    if !script_wm_asi.is_file() {
+        let candidates = [
+            scripts_dir.join("III.VC.SA.WindowedMode.asi.duplicate_bak"),
+            root_dir.join("III.VC.SA.WindowedMode.asi"),
+            root_dir.join("III.VC.SA.WindowedMode.asi.duplicate_bak"),
+            modloader_dir.join("_ESSENTIALS").join("Windowed Mode").join("III.VC.SA.WindowedMode.asi"),
+            modloader_dir.join("_ESSENTIALS").join("Windowed Mode").join("III.VC.SA.WindowedMode.asi.disabled"),
+        ];
+        for cand in &candidates {
+            if cand.is_file() {
+                let _ = std::fs::copy(cand, &script_wm_asi);
+                break;
+            }
+        }
+    }
+
+    // 3. Neutralize duplicates outside scripts/
+    let root_wm = root_dir.join("III.VC.SA.WindowedMode.asi");
+    if root_wm.is_file() {
+        let _ = std::fs::rename(&root_wm, root_dir.join("III.VC.SA.WindowedMode.asi.duplicate_bak"));
+    }
+    let ml_wm = modloader_dir.join("_ESSENTIALS").join("Windowed Mode").join("III.VC.SA.WindowedMode.asi");
+    if ml_wm.is_file() {
+        let _ = std::fs::rename(&ml_wm, modloader_dir.join("_ESSENTIALS").join("Windowed Mode").join("III.VC.SA.WindowedMode.asi.disabled"));
+    }
+
+    let root_ws = root_dir.join("GTASA.WidescreenFix.asi");
+    if root_ws.is_file() {
+        let _ = std::fs::rename(&root_ws, root_dir.join("GTASA.WidescreenFix.asi.duplicate_bak"));
+    }
+    let ml_ws = modloader_dir.join("_ESSENTIALS").join("Widescreen Fix by ThirteenAG").join("GTASA.WidescreenFix.asi");
+    if ml_ws.is_file() {
+        let _ = std::fs::rename(&ml_ws, modloader_dir.join("_ESSENTIALS").join("Widescreen Fix by ThirteenAG").join("GTASA.WidescreenFix.asi.disabled"));
+    }
+
+    // 4. Update GTASA.WidescreenFix.ini across scripts, root, and modloader
+    let ws_ini_targets = [
+        scripts_dir.join("GTASA.WidescreenFix.ini"),
+        root_dir.join("GTASA.WidescreenFix.ini"),
+        modloader_dir.join("_ESSENTIALS").join("Widescreen Fix by ThirteenAG").join("GTASA.WidescreenFix.ini"),
+    ];
+    let res_x = if width == 0 || width == 1536 { "0".to_string() } else { width.to_string() };
+    let res_y = if height == 0 || height == 864 { "0".to_string() } else { height.to_string() };
+    for ini_path in &ws_ini_targets {
+        let mut content = std::fs::read_to_string(ini_path).unwrap_or_else(|_| "[MAIN]\r\n".to_string());
+        update_or_append_ini_key(&mut content, "ResX", &res_x);
+        update_or_append_ini_key(&mut content, "ResY", &res_y);
+        update_or_append_ini_key(&mut content, "ForceAspectRatio", "auto");
+        update_or_append_ini_key(&mut content, "FrontendAspectRatio", "auto");
+        update_or_append_ini_key(&mut content, "AllowAltTabbingWithoutPausing", "1");
+        update_or_append_ini_key(&mut content, "SmartCutsceneBorders", "0");
+        let _ = std::fs::write(ini_path, content);
+    }
+
+    // 5. Update III.VC.SA.WindowedMode.ini across scripts, root, and modloader
+    // Mode 2 provides borderless fullscreen with automatic display resolution
+    let wm_ini_content = format!(
+        "[window]\r\nmode = {}\r\nmaximized = 1\r\npositionX = 0\r\npositionY = 0\r\nresolutionX = 0\r\nresolutionY = 0\r\n\r\n[game]\r\nmenuFPS = 0\r\nautoPause = 0\r\nautoResume = 1\r\n\r\n[MAIN]\r\nShowBorder = {}\r\nShowMenu = 0\r\n",
+        if windowed { 1 } else { 2 },
+        if windowed { "1" } else { "0" }
+    );
+    let wm_ini_targets = [
+        scripts_dir.join("III.VC.SA.WindowedMode.ini"),
+        root_dir.join("III.VC.SA.WindowedMode.ini"),
+        modloader_dir.join("_ESSENTIALS").join("Windowed Mode").join("III.VC.SA.WindowedMode.ini"),
+    ];
+    for ini_path in &wm_ini_targets {
+        let _ = std::fs::write(ini_path, &wm_ini_content);
+    }
+
+    // 6. Ensure dxvk.conf disallows exclusive fullscreen mode-switch crashes
+    let dxvk_conf = root_dir.join("dxvk.conf");
+    let dxvk_content = "d3d9.forceAspectRatio = 16:9\ndxvk.allowFse = False\n";
+    let _ = std::fs::write(&dxvk_conf, dxvk_content);
+
+    // 7. Ensure modloader.ini ignores .disabled mods
+    let ml_ini = modloader_dir.join("modloader.ini");
+    if ml_ini.is_file() {
+        if let Ok(mut text) = std::fs::read_to_string(&ml_ini) {
+            if !text.contains("*.disabled") {
+                if text.contains("_ignore") {
+                    text = text.replace("_ignore", "_ignore\r\n*.disabled\r\n*.disabled*");
+                } else if text.contains("[Profiles.Default.IgnoreMods]") {
+                    text = text.replace("[Profiles.Default.IgnoreMods]", "[Profiles.Default.IgnoreMods]\r\n*.disabled\r\n*.disabled*");
+                }
+                let _ = std::fs::write(&ml_ini, text);
+            }
+        }
+    }
+
+    // 8. Neutralize oversized LOADSCS.txd in modloader (> 10MB) to restore instant loading
+    if modloader_dir.is_dir() {
+        scan_and_disable_oversized_loadscs(&modloader_dir);
+    }
 }
 
 pub fn launch_game(
@@ -225,6 +569,47 @@ pub fn launch_game(
 
     // Auto-heal mod companion dependencies before launch
     auto_heal_companion_prerequisites(root_dir);
+
+    // Extract target display parameters from custom args
+    let mut width: u32 = 1920;
+    let mut height: u32 = 1080;
+    let mut is_windowed = false;
+
+    #[cfg(target_os = "windows")]
+    {
+        #[link(name = "user32")]
+        extern "system" {
+            fn GetSystemMetrics(nIndex: i32) -> i32;
+        }
+        let screen_w = unsafe { GetSystemMetrics(0) }; // SM_CXSCREEN
+        let screen_h = unsafe { GetSystemMetrics(1) }; // SM_CYSCREEN
+        if screen_w > 0 && screen_h > 0 {
+            width = screen_w as u32;
+            height = screen_h as u32;
+        }
+    }
+
+    let mut i = 0;
+    while i < custom_args.len() {
+        let arg = &custom_args[i];
+        if arg == "-window" || arg == "-w" {
+            is_windowed = true;
+        } else if arg == "-width" && i + 1 < custom_args.len() {
+            if let Ok(w) = custom_args[i + 1].parse::<u32>() {
+                width = w;
+            }
+            i += 1;
+        } else if arg == "-height" && i + 1 < custom_args.len() {
+            if let Ok(h) = custom_args[i + 1].parse::<u32>() {
+                height = h;
+            }
+            i += 1;
+        }
+        i += 1;
+    }
+
+    // Configure widescreen fix, windowed mode, and display engine
+    configure_widescreen_and_display(root_dir, width, height, is_windowed);
 
     let exe_path = Path::new(&game.executable_path);
     if !exe_path.exists() {
