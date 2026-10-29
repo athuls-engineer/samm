@@ -474,14 +474,13 @@ pub fn get_mod_dedicated_directories(m: &InstalledMod, game_root: &Path) -> Vec<
             }
         }
         // Top-level custom mod folder: <custom_folder>/...
-        else if !vanilla_protected.iter().any(|v| v.eq_ignore_ascii_case(first_clean)) {
-            if parts.len() >= 2 {
+        else if !vanilla_protected.iter().any(|v| v.eq_ignore_ascii_case(first_clean))
+            && parts.len() >= 2 {
                 let d = game_root.join(first_clean);
                 if !dirs.contains(&d) {
                     dirs.push(d);
                 }
             }
-        }
     }
 
     dirs
@@ -793,7 +792,7 @@ pub fn resolve_archive_layout(
             variant_scores.push((top.clone(), score));
         }
 
-        variant_scores.sort_by(|a, b| b.1.cmp(&a.1));
+        variant_scores.sort_by_key(|a| std::cmp::Reverse(a.1));
         if let Some((best, _)) = variant_scores.first() {
             chosen_variant = Some(best.clone());
             let other_variants: Vec<String> = non_vanilla_tops

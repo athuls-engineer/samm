@@ -255,20 +255,18 @@ pub fn auto_resolve_all_conflicts_physical(
                             let root_size = fs::metadata(&p).map(|m| m.len()).unwrap_or(0);
                             let ml_size = fs::metadata(ml_path).map(|m| m.len()).unwrap_or(0);
 
-                            if root_size > ml_size && root_size > 0 {
-                                if let Ok(_) = fs::copy(&p, ml_path) {
-                                    actions.push(format!(
-                                        "Updated ModLoader '{}' with newer build from root ({} -> {} bytes)",
-                                        fname, ml_size, root_size
-                                    ));
-                                }
+                            if root_size > ml_size && root_size > 0 && fs::copy(&p, ml_path).is_ok() {
+                                actions.push(format!(
+                                    "Updated ModLoader '{}' with newer build from root ({} -> {} bytes)",
+                                    fname, ml_size, root_size
+                                ));
                             }
 
                             // Physically disable root duplicate so ModLoader is the sole source of truth
                             let disabled_name = format!("{}.disabled", fname);
                             let disabled_path = root_path.join(&disabled_name);
                             let _ = fs::remove_file(&disabled_path); // remove old disabled if exists
-                            if let Ok(_) = fs::rename(&p, &disabled_path) {
+                            if fs::rename(&p, &disabled_path).is_ok() {
                                 actions.push(format!(
                                     "Disabled duplicate root plugin '{}' -> '{}' to prevent load collisions with ModLoader ({})",
                                     fname, disabled_name, mod_folder_name
@@ -283,7 +281,7 @@ pub fn auto_resolve_all_conflicts_physical(
                                 let ini_disabled = format!("{}.disabled", root_ini.file_name().unwrap().to_string_lossy());
                                 let ini_disabled_path = root_path.join(&ini_disabled);
                                 let _ = fs::remove_file(&ini_disabled_path);
-                                if let Ok(_) = fs::rename(&root_ini, &ini_disabled_path) {
+                                if fs::rename(&root_ini, &ini_disabled_path).is_ok() {
                                     actions.push(format!(
                                         "Disabled duplicate root configuration '{}' -> '{}'",
                                         root_ini.file_name().unwrap().to_string_lossy(), ini_disabled
@@ -304,7 +302,7 @@ pub fn auto_resolve_all_conflicts_physical(
         let ls_v2 = modloader_dir.join("SA_Loadscreens_4K_Definitive_v11");
         if ls_v1.is_dir() && ls_v2.is_dir() {
             // Remove or disable older/redundant folder
-            if let Ok(_) = fs::remove_dir_all(&ls_v1) {
+            if fs::remove_dir_all(&ls_v1).is_ok() {
                 actions.push("Removed redundant duplicate folder 'modloader/Loadscreens_4K_Definitive' in favor of 'SA_Loadscreens_4K_Definitive_v11' (saved 71 MB)".to_string());
                 resolved_count += 1;
             } else {
@@ -350,7 +348,7 @@ pub fn auto_resolve_all_conflicts_physical(
                         if prev_mod != &mod_folder_name {
                             // Deduplicate: disable the conflicting file in the lower priority mod
                             let disabled_target = format!("{}.disabled", full_path.to_string_lossy());
-                            if let Ok(_) = fs::rename(&full_path, &disabled_target) {
+                            if fs::rename(&full_path, &disabled_target).is_ok() {
                                 actions.push(format!(
                                     "Resolved asset collision for '{}': disabled duplicate in '{}' so '{}' takes precedence",
                                     rel_asset, mod_folder_name, prev_mod
@@ -441,7 +439,7 @@ pub fn auto_resolve_all_conflicts_physical(
     if ml_ws_asi.is_file() && root_ws_asi.is_file() {
         let disabled_ws = root_path.join("GTASA.WidescreenFix.asi.disabled");
         let _ = fs::remove_file(&disabled_ws);
-        if let Ok(_) = fs::rename(&root_ws_asi, &disabled_ws) {
+        if fs::rename(&root_ws_asi, &disabled_ws).is_ok() {
             actions.push("Disabled duplicate root WidescreenFix plugin in favor of active ModLoader version".to_string());
             resolved_count += 1;
         }
@@ -451,7 +449,7 @@ pub fn auto_resolve_all_conflicts_physical(
     for p in &[root_path.join("BlackBarsLoadingBar.asi"), root_path.join("scripts").join("BlackBarsLoadingBar.asi")] {
         if p.is_file() {
             let disabled = format!("{}.disabled", p.to_string_lossy());
-            if let Ok(_) = fs::rename(p, &disabled) {
+            if fs::rename(p, &disabled).is_ok() {
                 actions.push("Disabled 'BlackBarsLoadingBar.asi' to prevent artificial pillarboxing on modern displays".to_string());
                 resolved_count += 1;
             }

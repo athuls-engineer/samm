@@ -332,7 +332,7 @@ pub fn check_for_conflicts(
     // 1. Rescan existing mods on disk to ensure any external files are registered
     let profiles = state.db.get_profiles(&game_id).unwrap_or_default();
     let active_profile_id = profiles.iter().find(|p| p.is_active).map(|p| p.id.clone())
-        .unwrap_or_else(|| profiles.get(0).map(|p| p.id.clone()).unwrap_or_else(|| "default_profile".to_string()));
+        .unwrap_or_else(|| profiles.first().map(|p| p.id.clone()).unwrap_or_else(|| "default_profile".to_string()));
     let _ = crate::existing_mods::sync_existing_mods_into_db(&game, &active_profile_id, &state.db);
 
     // 2. Scan for all conflicts across ModLoader and game root
@@ -650,7 +650,7 @@ pub fn sync_existing_mods(
 
     let profiles = state.db.get_profiles(&game_id).map_err(|e| e.to_string())?;
     let active_pid = profiles.iter().find(|p| p.is_active).map(|p| p.id.clone())
-        .unwrap_or_else(|| profiles.get(0).map(|p| p.id.clone()).unwrap_or_else(|| "default_profile".to_string()));
+        .unwrap_or_else(|| profiles.first().map(|p| p.id.clone()).unwrap_or_else(|| "default_profile".to_string()));
 
     crate::existing_mods::sync_existing_mods_into_db(&game, &active_pid, &state.db)
 }
@@ -668,7 +668,7 @@ pub async fn pick_folder() -> Result<Option<String>, String> {
             }
         "#;
         let output = std::process::Command::new("powershell")
-            .args(&["-STA", "-NoProfile", "-NonInteractive", "-Command", script])
+            .args(["-STA", "-NoProfile", "-NonInteractive", "-Command", script])
             .output()
             .map_err(|e| e.to_string())?;
 
@@ -696,7 +696,7 @@ pub async fn pick_archive_file() -> Result<Option<String>, String> {
             }
         "#;
         let output = std::process::Command::new("powershell")
-            .args(&["-STA", "-NoProfile", "-NonInteractive", "-Command", script])
+            .args(["-STA", "-NoProfile", "-NonInteractive", "-Command", script])
             .output()
             .map_err(|e| e.to_string())?;
 
@@ -755,7 +755,7 @@ pub fn get_recent_downloaded_archives() -> Vec<DownloadedArchiveItem> {
         }
     }
 
-    items.sort_by(|a, b| b.modified_timestamp.cmp(&a.modified_timestamp));
+    items.sort_by_key(|a| std::cmp::Reverse(a.modified_timestamp));
     items.truncate(8);
     items
 }
@@ -813,16 +813,16 @@ pub async fn open_url_in_browser(url: String) -> Result<(), String> {
     if let Ok(resp) = client.head(trimmed).header("User-Agent", "Mozilla/5.0").send().await {
         if resp.status().as_u16() == 404 || resp.status().as_u16() == 410 {
             if trimmed.contains("mixmods.com.br") {
-                let slug = trimmed.trim_end_matches('/').split('/').last().unwrap_or("").replace('-', "+").replace(".html", "");
+                let slug = trimmed.trim_end_matches('/').split('/').next_back().unwrap_or("").replace('-', "+").replace(".html", "");
                 if !slug.is_empty() {
                     final_url = format!("https://www.mixmods.com.br/?s={}", slug);
                 }
             } else if trimmed.contains("gtainside.com") {
-                let slug = trimmed.trim_end_matches('/').split('/').last().unwrap_or("");
+                let slug = trimmed.trim_end_matches('/').split('/').next_back().unwrap_or("");
                 let clean = regex::Regex::new(r"^\d+-").ok().map(|re| re.replace(slug, "").to_string()).unwrap_or_else(|| slug.to_string());
                 final_url = format!("https://www.gtainside.com/en/sanandreas/search/{}/", clean.replace('-', "+"));
             } else if trimmed.contains("libertycity.net") {
-                let slug = trimmed.trim_end_matches('/').split('/').last().unwrap_or("").replace(".html", "");
+                let slug = trimmed.trim_end_matches('/').split('/').next_back().unwrap_or("").replace(".html", "");
                 let clean = regex::Regex::new(r"^\d+-").ok().map(|re| re.replace(&slug, "").to_string()).unwrap_or(slug);
                 final_url = format!("https://libertycity.net/index.php?do=search&subaction=search&story={}", clean.replace('-', "+"));
             }
@@ -832,7 +832,7 @@ pub async fn open_url_in_browser(url: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("rundll32")
-            .args(&["url.dll,FileProtocolHandler", &final_url])
+            .args(["url.dll,FileProtocolHandler", &final_url])
             .spawn()
             .map_err(|e| format!("Failed to open browser: {}", e))?;
         Ok(())
@@ -972,7 +972,7 @@ pub fn kill_game_process(
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         let _ = std::process::Command::new("taskkill")
-            .args(&["/F", "/IM", &exe_name])
+            .args(["/F", "/IM", &exe_name])
             .creation_flags(CREATE_NO_WINDOW)
             .output();
         Ok(())

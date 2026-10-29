@@ -21,8 +21,8 @@ pub fn generate_diagnostic_report(
 
     let recent_logs = vec![
         format!("[INFO] SAMM initialized v{}", app_version),
-        format!("[INFO] Target architecture: Windows x86_64 (Direct RenderWare 2004 PC Engine)"),
-        format!("[INFO] SQLite database operational"),
+        "[INFO] Target architecture: Windows x86_64 (Direct RenderWare 2004 PC Engine)".to_string(),
+        "[INFO] SQLite database operational".to_string(),
     ];
 
     DiagnosticReport {

@@ -7,13 +7,7 @@ use crate::database::Database;
 pub fn normalize_mod_family(raw: &str) -> String {
     let lower = raw.to_lowercase();
     let cleaned = lower
-        .replace('_', " ")
-        .replace('-', " ")
-        .replace('.', " ")
-        .replace('[', " ")
-        .replace(']', " ")
-        .replace('(', " ")
-        .replace(')', " ");
+        .replace(['_', '-', '.', '[', ']', '(', ')'], " ");
 
     if cleaned.contains("cheat") && cleaned.contains("menu") {
         return "cheat_menu".to_string();
@@ -131,7 +125,7 @@ pub fn scan_all_duplicates(game: &GameInstallation, db: &Database) -> Vec<Duplic
     // Refresh database with live disk scan first
     let profiles = db.get_profiles(&game.id).unwrap_or_default();
     let active_profile_id = profiles.iter().find(|p| p.is_active).map(|p| p.id.clone())
-        .unwrap_or_else(|| profiles.get(0).map(|p| p.id.clone()).unwrap_or_else(|| "default_profile".to_string()));
+        .unwrap_or_else(|| profiles.first().map(|p| p.id.clone()).unwrap_or_else(|| "default_profile".to_string()));
     let _ = crate::existing_mods::sync_existing_mods_into_db(game, &active_profile_id, db);
 
     let installed_mods = db.get_installed_mods(&game.id).unwrap_or_default();
@@ -278,9 +272,7 @@ pub fn scan_all_duplicates(game: &GameInstallation, db: &Database) -> Vec<Duplic
         let mod_title = group_titles.get(&family).cloned().unwrap_or_else(|| family.clone());
 
         let reason = if items.iter().any(|i| i.location_type == "root_asi") && items.iter().any(|i| i.location_type == "modloader") {
-            format!(
-                "Duplicate installation detected across root and ModLoader. The root plugin bypasses mod isolation and collides with ModLoader assets, causing UI textures or menus to fail to load.",
-            )
+            "Duplicate installation detected across root and ModLoader. The root plugin bypasses mod isolation and collides with ModLoader assets, causing UI textures or menus to fail to load.".to_string()
         } else {
             format!(
                 "Multiple overlapping copies of '{}' exist in your GTA SA installation. Running duplicate versions wastes memory and creates file hook collisions.",
@@ -491,7 +483,7 @@ pub fn remove_all_duplicates(
                 bytes_freed += item.size_bytes;
                 removed_items.push(item.name.clone());
             }
-            if let Ok(_) = remove_duplicate_mod(game, &dup_id, db) {
+            if remove_duplicate_mod(game, &dup_id, db).is_ok() {
                 removed_count += 1;
             }
         }

@@ -200,23 +200,23 @@ pub fn inspect_game_installation(target_path: &Path) -> Result<GameInstallation,
 
 pub fn discover_known_installations() -> Vec<GameInstallation> {
     let mut found = Vec::new();
-    let mut candidate_paths = Vec::new();
+    let candidate_paths = vec![
+        // Standard Steam library locations
+        PathBuf::from(r"C:\Program Files (x86)\Steam\steamapps\common\Grand Theft Auto San Andreas"),
+        PathBuf::from(r"C:\Steam\steamapps\common\Grand Theft Auto San Andreas"),
+        PathBuf::from(r"D:\SteamLibrary\steamapps\common\Grand Theft Auto San Andreas"),
+        PathBuf::from(r"E:\SteamLibrary\steamapps\common\Grand Theft Auto San Andreas"),
 
-    // Standard Steam library locations
-    candidate_paths.push(PathBuf::from(r"C:\Program Files (x86)\Steam\steamapps\common\Grand Theft Auto San Andreas"));
-    candidate_paths.push(PathBuf::from(r"C:\Steam\steamapps\common\Grand Theft Auto San Andreas"));
-    candidate_paths.push(PathBuf::from(r"D:\SteamLibrary\steamapps\common\Grand Theft Auto San Andreas"));
-    candidate_paths.push(PathBuf::from(r"E:\SteamLibrary\steamapps\common\Grand Theft Auto San Andreas"));
+        // Standard Rockstar Games Launcher locations
+        PathBuf::from(r"C:\Program Files\Rockstar Games\Grand Theft Auto San Andreas"),
+        PathBuf::from(r"C:\Program Files (x86)\Rockstar Games\Grand Theft Auto San Andreas"),
 
-    // Standard Rockstar Games Launcher locations
-    candidate_paths.push(PathBuf::from(r"C:\Program Files\Rockstar Games\Grand Theft Auto San Andreas"));
-    candidate_paths.push(PathBuf::from(r"C:\Program Files (x86)\Rockstar Games\Grand Theft Auto San Andreas"));
-
-    // Classic retail install paths
-    candidate_paths.push(PathBuf::from(r"C:\Program Files (x86)\Rockstar Games\GTA San Andreas"));
-    candidate_paths.push(PathBuf::from(r"C:\Program Files\Rockstar Games\GTA San Andreas"));
-    candidate_paths.push(PathBuf::from(r"C:\Games\GTA San Andreas"));
-    candidate_paths.push(PathBuf::from(r"D:\Games\GTA San Andreas"));
+        // Classic retail install paths
+        PathBuf::from(r"C:\Program Files (x86)\Rockstar Games\GTA San Andreas"),
+        PathBuf::from(r"C:\Program Files\Rockstar Games\GTA San Andreas"),
+        PathBuf::from(r"C:\Games\GTA San Andreas"),
+        PathBuf::from(r"D:\Games\GTA San Andreas"),
+    ];
 
     for p in candidate_paths {
         if p.exists() {

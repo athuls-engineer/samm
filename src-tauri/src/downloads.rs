@@ -73,6 +73,7 @@ impl DownloadManager {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn start_download(
         &self,
         mod_id: &str,

@@ -90,7 +90,7 @@ pub fn run() {
                 {
                     use std::ptr::null_mut;
                     if let Ok(hwnd) = window.hwnd() {
-                        let hwnd_ptr = hwnd.0 as *mut std::ffi::c_void;
+                        let hwnd_ptr = hwnd.0;
                         #[link(name = "user32")]
                         extern "system" {
                             fn SendMessageW(hWnd: *mut std::ffi::c_void, Msg: u32, wParam: usize, lParam: isize) -> isize;
@@ -116,8 +116,8 @@ pub fn run() {
                             let lg_cx = GetSystemMetrics(11); // SM_CXICON
                             let lg_cy = GetSystemMetrics(12); // SM_CYICON
 
-                            let h_icon_big = LoadImageW(h_module, 1 as *const u16, 1 /* IMAGE_ICON */, lg_cx, lg_cy, 0);
-                            let h_icon_small = LoadImageW(h_module, 1 as *const u16, 1 /* IMAGE_ICON */, sm_cx, sm_cy, 0);
+                            let h_icon_big = LoadImageW(h_module, std::ptr::dangling::<u16>(), 1 /* IMAGE_ICON */, lg_cx, lg_cy, 0);
+                            let h_icon_small = LoadImageW(h_module, std::ptr::dangling::<u16>(), 1 /* IMAGE_ICON */, sm_cx, sm_cy, 0);
 
                             if !h_icon_big.is_null() {
                                 SendMessageW(hwnd_ptr, 0x0080 /* WM_SETICON */, 1 /* ICON_BIG */, h_icon_big as isize);

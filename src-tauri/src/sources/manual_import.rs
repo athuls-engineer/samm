@@ -82,6 +82,12 @@ impl ManualImportAdapter {
     }
 }
 
+impl Default for ManualImportAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl SourceAdapter for ManualImportAdapter {
     fn id(&self) -> &'static str {

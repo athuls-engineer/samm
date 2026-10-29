@@ -10,6 +10,7 @@ mod windows_launch {
     use std::path::Path;
 
     #[repr(C)]
+    #[allow(clippy::upper_case_acronyms)]
     struct SHELLEXECUTEINFOW {
         cb_size: u32,
         f_mask: u32,
@@ -170,7 +171,7 @@ fn auto_heal_companion_prerequisites(root_dir: &Path) {
         #[cfg(target_os = "windows")]
         {
             let _ = std::process::Command::new("powershell")
-                .args(&[
+                .args([
                     "-NoProfile",
                     "-NonInteractive",
                     "-Command",
@@ -349,7 +350,7 @@ fn auto_heal_companion_prerequisites(root_dir: &Path) {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         let _ = std::process::Command::new("powershell")
-            .args(&[
+            .args([
                 "-NoProfile",
                 "-NonInteractive",
                 "-Command",
@@ -638,7 +639,7 @@ pub fn launch_game(
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         let _ = std::process::Command::new("taskkill")
-            .args(&["/F", "/IM", &exe_name])
+            .args(["/F", "/IM", &exe_name])
             .creation_flags(CREATE_NO_WINDOW)
             .output();
         // Give OS a moment to release mutex

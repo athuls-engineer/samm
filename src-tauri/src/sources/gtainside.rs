@@ -4074,6 +4074,12 @@ impl GtaInsideAdapter {
     }
 }
 
+impl Default for GtaInsideAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl SourceAdapter for GtaInsideAdapter {
     fn id(&self) -> &'static str {

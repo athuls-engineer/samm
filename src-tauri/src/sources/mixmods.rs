@@ -7569,6 +7569,12 @@ impl MixModsAdapter {
     }
 }
 
+impl Default for MixModsAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl SourceAdapter for MixModsAdapter {
     fn id(&self) -> &'static str {

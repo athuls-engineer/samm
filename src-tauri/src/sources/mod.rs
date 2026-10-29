@@ -34,12 +34,13 @@ pub struct SourceManager {
 
 impl SourceManager {
     pub fn new() -> Self {
-        let mut adapters: Vec<Box<dyn SourceAdapter>> = Vec::new();
-        adapters.push(Box::new(gtainside::GtaInsideAdapter::new()));
-        adapters.push(Box::new(libertycity::LibertyCityAdapter::new()));
-        adapters.push(Box::new(mixmods::MixModsAdapter::new()));
-        adapters.push(Box::new(gtagarage::GtaGarageAdapter::new()));
-        adapters.push(Box::new(manual_import::ManualImportAdapter::new()));
+        let adapters: Vec<Box<dyn SourceAdapter>> = vec![
+            Box::new(gtainside::GtaInsideAdapter::new()),
+            Box::new(libertycity::LibertyCityAdapter::new()),
+            Box::new(mixmods::MixModsAdapter::new()),
+            Box::new(gtagarage::GtaGarageAdapter::new()),
+            Box::new(manual_import::ManualImportAdapter::new()),
+        ];
 
         SourceManager { adapters }
     }
@@ -163,5 +164,11 @@ impl SourceManager {
             }
         }
         Err(format!("Source adapter '{}' not found", source_id))
+    }
+}
+
+impl Default for SourceManager {
+    fn default() -> Self {
+        Self::new()
     }
 }

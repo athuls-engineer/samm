@@ -3107,6 +3107,12 @@ impl LibertyCityAdapter {
     }
 }
 
+impl Default for LibertyCityAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl SourceAdapter for LibertyCityAdapter {
     fn id(&self) -> &'static str {

@@ -558,10 +558,7 @@ pub fn scan_existing_mods(root_path: &Path) -> Vec<DetectedModInfo> {
                     ("local_loose_cheat_menu".to_string(), "Cheat Menu Assets (Loose Folder)".to_string(), "Gameplay / Scripts".to_string())
                 } else {
                     let display_title = clean_name
-                        .replace('[', " ")
-                        .replace(']', " ")
-                        .replace('-', " ")
-                        .replace('_', " ");
+                        .replace(['[', ']', '-', '_'], " ");
                     let title = display_title.split_whitespace().collect::<Vec<_>>().join(" ");
                     (
                         format!("local_loose_{}", clean_slug(clean_name)),
@@ -740,7 +737,7 @@ pub fn sync_existing_mods_into_db(
             conflict_notes: Vec::new(),
         };
 
-        if let Ok(_) = db.save_installed_mod(&installed_mod) {
+        if db.save_installed_mod(&installed_mod).is_ok() {
             // Link to profile
             if let Ok(mut profiles) = db.get_profiles(&game.id) {
                 if let Some(p) = profiles.iter_mut().find(|p| p.id == profile_id) {

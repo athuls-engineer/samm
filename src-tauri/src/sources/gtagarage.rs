@@ -20,6 +20,12 @@ impl GtaGarageAdapter {
     }
 }
 
+impl Default for GtaGarageAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl SourceAdapter for GtaGarageAdapter {
     fn id(&self) -> &'static str {
@@ -1871,7 +1877,7 @@ impl SourceAdapter for GtaGarageAdapter {
                     || m.author.to_lowercase().contains(&q)
                     || m.tags.iter().any(|t| t.to_lowercase().contains(&q));
 
-                let matches_cat = cat.as_ref().map_or(true, |c| {
+                let matches_cat = cat.as_ref().is_none_or(|c| {
                     if c == "essential & popular" || c == "essential" || c == "popular" {
                         m.tags.iter().any(|t| t.eq_ignore_ascii_case("essential") || t.eq_ignore_ascii_case("popular"))
                     } else if c == "goofy & memes" || c == "goofy" || c == "memes" {
